@@ -174,6 +174,11 @@ bool init_deleg_heuristics(cache_entry_t *entry)
 	return true;
 }
 
+/* Most clients retry NFS operations after 5 seconds. The following
+ * should be good enough to avoid starving a client's open
+ */
+#define RECALL2DELEG_TIME 10 /* should this be configurable? */
+
 /**
  * @brief Decide if a delegation should be granted based on heuristics.
  *
@@ -191,8 +196,7 @@ bool should_we_grant_deleg(cache_entry_t *entry, nfs_client_id_t *client,
 			   state_t *open_state)
 {
 	/* specific file, all clients, stats */
-	struct file_deleg_stats *file_stats =
-		&entry->object.file.fdeleg_stats;
+	struct file_deleg_stats *file_stats = &entry->object.file.fdeleg_stats;
 	/* specific client, all files stats */
 	struct c_deleg_stats *cl_stats = &client->cid_deleg_stats;
 	/* specific client, specific file stats */
@@ -201,12 +205,22 @@ bool should_we_grant_deleg(cache_entry_t *entry, nfs_client_id_t *client,
 	time_t spread;
 
 	LogDebug(COMPONENT_STATE, "Checking if we should grant delegation.");
-	return true;
-	if (open_state->state_type != STATE_TYPE_SHARE) {
-		LogDebug(COMPONENT_STATE,
-			 "expects a SHARE open state and no other.");
+
+	assert(open_state->state_type == STATE_TYPE_SHARE);
+
+	/* If there is a recent recall on this file, the client that made
+	 * the conflicting open may retry the open later. Don't give out
+	 * delegation to avoid starving the client's open that cuased
+	 * the recall.
+	 */
+	if (time(NULL) - file_stats->fds_last_recall < RECALL2DELEG_TIME)
 		return false;
-	}
+
+	/* Discuss if below checks are useful, and if so, correct the
+	 * check by promoting ints to floats. For now, preserve the old
+	 * code and return true here!
+	 */
+	return true;
 
 	/* Check if this file is opened too frequently to delegate. */
 	spread = time(NULL) - file_stats->fds_first_open;
@@ -215,23 +229,6 @@ bool should_we_grant_deleg(cache_entry_t *entry, nfs_client_id_t *client,
 		LogDebug(COMPONENT_STATE, "This file is opened too frequently"
 			 " to delegate.");
 		return false;
-	}
-
-	/* Check if open state and requested delegation agree. */
-	if (file_stats->fds_curr_delegations > 0) {
-		if (file_stats->fds_deleg_type == OPEN_DELEGATE_READ &&
-		    open_state->state_data.share.share_access &
-		    OPEN4_SHARE_ACCESS_WRITE) {
-			LogMidDebug(COMPONENT_STATE,
-				    "READ delegate requested, but file is opened for WRITE.");
-			return false;
-		}
-		if (file_stats->fds_deleg_type == OPEN_DELEGATE_WRITE &&
-		    !(open_state->state_data.share.share_access &
-		      OPEN4_SHARE_ACCESS_WRITE)) {
-			LogMidDebug(COMPONENT_STATE,
-				    "WRITE delegate requested, but file is not opened for WRITE.");
-		}
 	}
 
 	/* Check if this is a misbehaving or unreliable client */
@@ -245,6 +242,7 @@ bool should_we_grant_deleg(cache_entry_t *entry, nfs_client_id_t *client,
 			 ACCEPTABLE_FAILS);
 		return false;
 	}
+
 	/* minimum average milliseconds that delegations should be held on a
 	   file. if less, then this is not a good file for delegations. */
 #define MIN_AVG_HOLD 1500

@@ -340,6 +340,8 @@ int32_t dec_client_id_ref(nfs_client_id_t *clientid)
 
 	if (isFullDebug(COMPONENT_CLIENTID))
 		display_client_id_rec(clientid, str);
+	else
+		strlcpy(str, "<none>", sizeof(str));
 
 	cid_refcount = atomic_dec_int32_t(&clientid->cid_refcount);
 
@@ -831,23 +833,20 @@ bool nfs_client_id_expire(nfs_client_id_t *clientid, bool make_stale)
 	init_root_op_context(&root_op_context, NULL, NULL,
 			     0, 0, UNKNOWN_REQUEST);
 
+	if (isFullDebug(COMPONENT_CLIENTID))
+		display_client_id_rec(clientid, str);
+	else
+		strlcpy(str, "<none>", sizeof(str));
+
 	pthread_mutex_lock(&clientid->cid_mutex);
 	if (clientid->cid_confirmed == EXPIRED_CLIENT_ID) {
-		if (isFullDebug(COMPONENT_CLIENTID)) {
-			display_client_id_rec(clientid, str);
-			LogFullDebug(COMPONENT_CLIENTID,
-				     "Expired (skipped) {%s}", str);
-		}
-
+		LogFullDebug(COMPONENT_CLIENTID, "Expired (skipped) {%s}", str);
 		pthread_mutex_unlock(&clientid->cid_mutex);
 		release_root_op_context();
 		return false;
 	}
 
-	if (isDebug(COMPONENT_CLIENTID)) {
-		display_client_id_rec(clientid, str);
-		LogDebug(COMPONENT_CLIENTID, "Expiring {%s}", str);
-	}
+	LogDebug(COMPONENT_CLIENTID, "Expiring {%s}", str);
 
 	if ((clientid->cid_confirmed == CONFIRMED_CLIENT_ID) ||
 	    (clientid->cid_confirmed == STALE_CLIENT_ID))
@@ -1037,16 +1036,10 @@ bool nfs_client_id_expire(nfs_client_id_t *clientid, bool make_stale)
 		clientid->cid_recov_dir = NULL;
 	}
 
-	if (isFullDebug(COMPONENT_CLIENTID)) {
-		display_client_id_rec(clientid, str);
-		LogFullDebug(COMPONENT_CLIENTID, "Expired (done) {%s}", str);
-	}
+	LogFullDebug(COMPONENT_CLIENTID, "Expired (done) {%s}", str);
 
-	if (isDebug(COMPONENT_CLIENTID)) {
-		display_client_id_rec(clientid, str);
-		LogDebug(COMPONENT_CLIENTID,
-			 "About to release last reference to {%s}", str);
-	}
+	LogDebug(COMPONENT_CLIENTID,
+		 "About to release last reference to {%s}", str);
 
 	/* Release the hash table reference to the clientid. */
 	if (!make_stale)
@@ -1375,6 +1368,8 @@ int32_t dec_client_record_ref(nfs_client_record_t *record)
 
 	if (isDebug(COMPONENT_CLIENTID))
 		display_client_record(record, str);
+	else
+		strlcpy(str, "<none>", sizeof(str));
 
 	refcount = atomic_dec_int32_t(&record->cr_refcount);
 

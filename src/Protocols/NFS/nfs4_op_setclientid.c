@@ -60,9 +60,6 @@ int nfs4_op_setclientid(struct nfs_argop4 *op, compound_data_t *data,
 	    &resp->nfs_resop4_u.opsetclientid;
 	clientaddr4 * const res_SETCLIENTID4_INUSE =
 	    &resp->nfs_resop4_u.opsetclientid.SETCLIENTID4res_u.client_using;
-	char str_verifier[NFS4_VERIFIER_SIZE * 2 + 1];
-	char str_client[NFS4_OPAQUE_LIMIT * 2 + 1];
-	char str_client_addr[SOCK_NAME_MAX + 1];
 	nfs_client_record_t *client_record;
 	nfs_client_id_t *conf;
 	nfs_client_id_t *unconf;
@@ -81,6 +78,10 @@ int nfs4_op_setclientid(struct nfs_argop4 *op, compound_data_t *data,
 	copy_xprt_addr(&client_addr, data->req->rq_xprt);
 
 	if (isDebug(COMPONENT_CLIENTID)) {
+		char str_verifier[NFS4_VERIFIER_SIZE * 2 + 1];
+		char str_client[NFS4_OPAQUE_LIMIT * 2 + 1];
+		char str_client_addr[SOCK_NAME_MAX + 1];
+
 		sprint_sockip(&client_addr, str_client_addr,
 			      sizeof(str_client_addr));
 
@@ -90,15 +91,15 @@ int nfs4_op_setclientid(struct nfs_argop4 *op, compound_data_t *data,
 
 		sprint_mem(str_verifier, arg_SETCLIENTID4->client.verifier,
 			   NFS4_VERIFIER_SIZE);
-	}
 
-	LogDebug(COMPONENT_CLIENTID,
-		 "SETCLIENTID Client addr=%s id=%s verf=%s callback={program=%u r_addr=%s r_netid=%s} ident=%u",
-		 str_client_addr, str_client, str_verifier,
-		 arg_SETCLIENTID4->callback.cb_program,
-		 arg_SETCLIENTID4->callback.cb_location.r_addr,
-		 arg_SETCLIENTID4->callback.cb_location.r_netid,
-		 arg_SETCLIENTID4->callback_ident);
+		LogDebug(COMPONENT_CLIENTID,
+			 "SETCLIENTID Client addr=%s id=%s verf=%s callback={program=%u r_addr=%s r_netid=%s} ident=%u",
+			 str_client_addr, str_client, str_verifier,
+			 arg_SETCLIENTID4->callback.cb_program,
+			 arg_SETCLIENTID4->callback.cb_location.r_addr,
+			 arg_SETCLIENTID4->callback.cb_location.r_netid,
+			 arg_SETCLIENTID4->callback_ident);
+	}
 
 	/* Do we already have one or more records for client id (x)? */
 	client_record = get_client_record(arg_SETCLIENTID4->client.id.id_val,

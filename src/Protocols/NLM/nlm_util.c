@@ -182,7 +182,6 @@ void free_grant_arg(state_async_queue_t *arg)
 static void nlm4_send_grant_msg(state_async_queue_t *arg)
 {
 	int retval;
-	char buffer[1024];
 	state_status_t state_status = STATE_SUCCESS;
 	state_cookie_entry_t *cookie_entry;
 	state_nlm_async_data_t *nlm_arg =
@@ -191,6 +190,8 @@ static void nlm4_send_grant_msg(state_async_queue_t *arg)
 	struct gsh_export *export;
 
 	if (isDebug(COMPONENT_NLM)) {
+		char buffer[1024];
+
 		netobj_to_string(&nlm_arg->nlm_async_args.nlm_async_grant.
 				 cookie, buffer, sizeof(buffer));
 

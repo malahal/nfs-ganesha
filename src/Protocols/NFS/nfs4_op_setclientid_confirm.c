@@ -66,9 +66,6 @@ int nfs4_op_setclientid_confirm(struct nfs_argop4 *op, compound_data_t *data,
 	nfs_client_record_t *client_record;
 	clientid4 clientid = 0;
 	sockaddr_t client_addr;
-	char str_verifier[NFS4_VERIFIER_SIZE * 2 + 1];
-	char str_client_addr[SOCK_NAME_MAX + 1];
-	char str_client[NFS4_OPAQUE_LIMIT * 2 + 1];
 	int rc;
 
 	resp->resop = NFS4_OP_SETCLIENTID_CONFIRM;
@@ -83,18 +80,21 @@ int nfs4_op_setclientid_confirm(struct nfs_argop4 *op, compound_data_t *data,
 	copy_xprt_addr(&client_addr, data->req->rq_xprt);
 
 	if (isDebug(COMPONENT_CLIENTID)) {
+		char str_verifier[NFS4_VERIFIER_SIZE * 2 + 1];
+		char str_client_addr[SOCK_NAME_MAX + 1];
+
 		sprint_sockip(&client_addr, str_client_addr,
 			      sizeof(str_client_addr));
 
 		sprint_mem(str_verifier,
 			   arg_SETCLIENTID_CONFIRM4->setclientid_confirm,
 			   NFS4_VERIFIER_SIZE);
-	}
 
-	LogDebug(COMPONENT_CLIENTID,
-		 "SETCLIENTID_CONFIRM client addr=%s clientid=%" PRIx64
-		 " setclientid_confirm=%s",
-		 str_client_addr, clientid, str_verifier);
+		LogDebug(COMPONENT_CLIENTID,
+			 "SETCLIENTID_CONFIRM client addr=%s clientid=%" PRIx64
+			 " setclientid_confirm=%s",
+			 str_client_addr, clientid, str_verifier);
+	}
 
 	/* First try to look up unconfirmed record */
 	rc = nfs_client_id_get_unconfirmed(clientid, &unconf);
@@ -159,6 +159,7 @@ int nfs4_op_setclientid_confirm(struct nfs_argop4 *op, compound_data_t *data,
 				     true)) {
 			if (isDebug(COMPONENT_CLIENTID)) {
 				char unconfirmed_addr[SOCK_NAME_MAX + 1];
+				FIX str_client_addr;
 
 				sprint_sockip(&unconf->cid_client_addr,
 					      unconfirmed_addr,
@@ -218,9 +219,6 @@ int nfs4_op_setclientid_confirm(struct nfs_argop4 *op, compound_data_t *data,
 	}
 
 	if (conf != NULL) {
-		if (isDebug(COMPONENT_CLIENTID) && conf != NULL)
-			display_clientid_name(conf, str_client);
-
 		/* First must match principal */
 		if (!nfs_compare_clientcred(&conf->cid_credential,
 					    &data->credential)
@@ -228,8 +226,11 @@ int nfs4_op_setclientid_confirm(struct nfs_argop4 *op, compound_data_t *data,
 				     &client_addr,
 				     true)) {
 			if (isDebug(COMPONENT_CLIENTID)) {
+				char str_client[NFS4_OPAQUE_LIMIT * 2 + 1];
 				char confirmed_addr[SOCK_NAME_MAX + 1];
+				str_client_addr;
 
+				display_clientid_name(conf, str_client);
 				sprint_sockip(&conf->cid_client_addr,
 					      confirmed_addr,
 					      sizeof(confirmed_addr));
@@ -265,10 +266,15 @@ int nfs4_op_setclientid_confirm(struct nfs_argop4 *op, compound_data_t *data,
 			 * NFS4ERR_CLID_INUSE
 			 */
 			if (isDebug(COMPONENT_CLIENTID)) {
-				char str[HASHTABLE_DISPLAY_STRLEN];
+				char str_verifier[NFS4_VERIFIER_SIZE * 2 + 1];
 				char str_conf_verifier[NFS4_VERIFIER_SIZE * 2 +
 						       1];
+				char str[HASHTABLE_DISPLAY_STRLEN];
 
+				sprint_mem(str_verifier,
+					   arg_SETCLIENTID_CONFIRM4->
+					   	setclientid_confirm,
+					   NFS4_VERIFIER_SIZE);
 				sprint_mem(str_conf_verifier,
 					   conf->cid_verifier,
 					   NFS4_VERIFIER_SIZE);

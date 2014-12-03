@@ -61,7 +61,6 @@ int mnt_Mnt(nfs_arg_t *arg,
 	int auth_flavor[NB_AUTH_FLAVOR];
 	int index_auth = 0;
 	int i = 0;
-	char dumpfh[1024];
 	int retval = NFS_REQ_OK;
 	nfs_fh3 *fh3 = (nfs_fh3 *) &res->res_mnt3.mountres3_u.mountinfo.fhandle;
 	cache_entry_t *entry = NULL;
@@ -157,13 +156,10 @@ int mnt_Mnt(nfs_arg_t *arg,
 	res->res_mnt3.fhs_status = nfs3_AllocateFH(fh3);
 
 	if (res->res_mnt3.fhs_status == MNT3_OK) {
-		if (!nfs3_FSALToFhandle(fh3, pfsal_handle, export)) {
+		if (!nfs3_FSALToFhandle(fh3, pfsal_handle, export))
 			res->res_mnt3.fhs_status = MNT3ERR_INVAL;
-		} else {
-			if (isDebug(COMPONENT_NFSPROTO))
-				sprint_fhandle3(dumpfh, fh3);
+		else
 			res->res_mnt3.fhs_status = MNT3_OK;
-		}
 	}
 
 	if (entry != NULL) {
@@ -195,12 +191,17 @@ int mnt_Mnt(nfs_arg_t *arg,
 	}
 #endif
 
-	LogDebug(COMPONENT_NFSPROTO,
-		 "MOUNT: Entry supports %d different flavours handle=%s for client %s",
-		 index_auth, dumpfh,
-			op_ctx->client
-				? op_ctx->client->hostaddr_str
-				: "unknown client");
+	if (isDebug(COMPONENT_NFSPROTO)) {
+		char dumpfh[1024];
+
+		sprint_fhandle3(dumpfh, fh3);
+		LogDebug(COMPONENT_NFSPROTO,
+			 "MOUNT: Entry supports %d different flavours handle=%s for client %s",
+			 index_auth, dumpfh,
+				op_ctx->client
+					? op_ctx->client->hostaddr_str
+					: "unknown client");
+	}
 
 	mountres3_ok * const RES_MOUNTINFO =
 	    &res->res_mnt3.mountres3_u.mountinfo;

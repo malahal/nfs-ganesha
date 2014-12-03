@@ -315,6 +315,8 @@ int nfs41_Session_Get_Pointer(char sessionid[NFS4_SESSIONID_SIZE],
 	if (isFullDebug(COMPONENT_SESSIONS)) {
 		display_session_id(sessionid, str);
 		LogFullDebug(COMPONENT_SESSIONS, "Get Session %s", str);
+	} else {
+		strlcpy(str, "<none>", sizeof(str));
 	}
 
 	key.addr = sessionid;

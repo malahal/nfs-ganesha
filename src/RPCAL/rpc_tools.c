@@ -412,7 +412,7 @@ void socket_setoptions(int socketFd)
 
 int ipstring_to_sockaddr(const char *str, sockaddr_t *addr)
 {
-	struct addrinfo *info, hints, *p;
+	struct addrinfo *info, hints;
 	int rc;
 	char ipname[SOCK_NAME_MAX + 1];
 
@@ -423,8 +423,9 @@ int ipstring_to_sockaddr(const char *str, sockaddr_t *addr)
 	hints.ai_protocol = 0;
 	rc = getaddrinfo(str, NULL, &hints, &info);
 	if (rc == 0 && info != NULL) {
-		p = info;
 		if (isFullDebug(COMPONENT_RPC)) {
+			struct addrinfo *p = info;
+
 			while (p != NULL) {
 				sprint_sockaddr((sockaddr_t *) p->ai_addr,
 						ipname, sizeof(ipname));

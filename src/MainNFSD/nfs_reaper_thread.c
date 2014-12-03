@@ -144,7 +144,7 @@ static void reaper_run(struct fridgethr_context *ctx)
 		}
 	}
 
-	if (isDebug(COMPONENT_CLIENTID) && ((rst->count > 0) || !rst->logged)) {
+	if ((rst->count > 0) || !rst->logged) { /* TODO: Was a bug here?? */
 		LogDebug(COMPONENT_CLIENTID,
 			 "Now checking NFS4 clients for expiration");
 

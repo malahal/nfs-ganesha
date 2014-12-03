@@ -1320,16 +1320,14 @@ uint64_t lock_cookie_rbt_hash_func(hash_parameter_t *hparam,
  */
 void free_cookie(state_cookie_entry_t *cookie_entry, bool unblock)
 {
-	char str[HASHTABLE_DISPLAY_STRLEN];
 	void *cookie = cookie_entry->sce_cookie;
 
-	if (isFullDebug(COMPONENT_STATE))
-		display_lock_cookie_entry(cookie_entry, str);
+	if (isFullDebug(COMPONENT_STATE)) {
+		char str[HASHTABLE_DISPLAY_STRLEN];
 
-	/* Since the cookie is not in the hash table,
-	 * we can just free the memory
-	 */
-	LogFullDebug(COMPONENT_STATE, "Free Lock Cookie {%s}", str);
+		display_lock_cookie_entry(cookie_entry, str);
+		LogFullDebug(COMPONENT_STATE, "Free Lock Cookie {%s}", str);
+	}
 
 	/* If block data is still attached to lock entry, remove it */
 	if (cookie_entry->sce_lock_entry != NULL && unblock) {
@@ -1375,12 +1373,13 @@ state_status_t state_add_grant_cookie(cache_entry_t *entry,
 		return status;
 	}
 
-	if (isFullDebug(COMPONENT_STATE))
-		DisplayOpaqueValue(cookie, cookie_size, str);
-
 	hash_entry = gsh_malloc(sizeof(*hash_entry));
 	if (hash_entry == NULL) {
-		LogFullDebug(COMPONENT_STATE, "KEY {%s} NO MEMORY", str);
+		if (isFullDebug(COMPONENT_STATE)) {
+			DisplayOpaqueValue(cookie, cookie_size, str);
+			LogFullDebug(COMPONENT_STATE,
+				     "KEY {%s} NO MEMORY", str);
+		}
 		status = STATE_MALLOC_ERROR;
 		return status;
 	}
@@ -1389,7 +1388,11 @@ state_status_t state_add_grant_cookie(cache_entry_t *entry,
 
 	buffkey.addr = gsh_malloc(cookie_size);
 	if (buffkey.addr == NULL) {
-		LogFullDebug(COMPONENT_STATE, "KEY {%s} NO MEMORY", str);
+		if (isFullDebug(COMPONENT_STATE)) {
+			DisplayOpaqueValue(cookie, cookie_size, str);
+			LogFullDebug(COMPONENT_STATE,
+				     "KEY {%s} NO MEMORY", str);
+		}
 		gsh_free(hash_entry);
 		status = STATE_MALLOC_ERROR;
 		return status;
@@ -1411,9 +1414,13 @@ state_status_t state_add_grant_cookie(cache_entry_t *entry,
 	if (hashtable_test_and_set
 	    (ht_lock_cookies, &buffkey, &buffval,
 	     HASHTABLE_SET_HOW_SET_NO_OVERWRITE) != HASHTABLE_SUCCESS) {
+		if (isFullDebug(COMPONENT_STATE)) {
+			display_lock_cookie_entry(hash_entry, str);
+			LogFullDebug(COMPONENT_STATE,
+				     "Lock Cookie {%s} HASH TABLE ERROR", str);
+		}
+
 		gsh_free(hash_entry);
-		LogFullDebug(COMPONENT_STATE,
-			     "Lock Cookie {%s} HASH TABLE ERROR", str);
 		status = STATE_HASH_TABLE_ERROR;
 		return status;
 	}
@@ -1535,13 +1542,14 @@ state_status_t state_find_grant(void *cookie, int cookie_size,
 	struct gsh_buffdesc buffkey;
 	struct gsh_buffdesc buffval;
 	struct gsh_buffdesc buffused_key;
-	char str[HASHTABLE_DISPLAY_STRLEN];
 	state_status_t status = 0;
 
 	buffkey.addr = cookie;
 	buffkey.len = cookie_size;
 
 	if (isFullDebug(COMPONENT_STATE) && isDebug(COMPONENT_HASHTABLE)) {
+		char str[HASHTABLE_DISPLAY_STRLEN];
+
 		display_lock_cookie_key(&buffkey, str);
 		LogFullDebug(COMPONENT_STATE, "KEY {%s}", str);
 	}

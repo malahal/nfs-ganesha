@@ -649,6 +649,8 @@ bool Check_nfs4_seqid(state_owner_t *owner, seqid4 seqid, nfs_argop4 *args,
 
 	if (isDebug(COMPONENT_STATE))
 		DisplayOwner(owner, str);
+	else
+		strlcpy(str, "<none>", sizeof(str));
 
 	/* If this is a new state owner, client may start with any seqid */
 	if (owner->so_owner.so_nfs4_owner.so_last_entry == NULL) {

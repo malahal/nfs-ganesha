@@ -21,10 +21,8 @@
 #include <string.h>
 #include <fcntl.h>
 
-#ifdef _USE_NFS4_ACL
 static int gpfs_acl_2_fsal_acl(struct attrlist *p_object_attributes,
 			       gpfs_acl_t *p_gpfsacl);
-#endif				/* _USE_NFS4_ACL */
 
 fsal_status_t posix2fsal_attributes(const struct stat *p_buffstat,
 				    struct attrlist *p_fsalattr_out)
@@ -130,14 +128,12 @@ fsal_status_t gpfsfsal_xstat_2_fsal_attributes(gpfsfsal_xstat_t *p_buffxstat,
 	}
 	if (FSAL_TEST_MASK(p_fsalattr_out->mask, ATTR_ACL)) {
 		p_fsalattr_out->acl = NULL;
-#ifdef _USE_NFS4_ACL
-		if (p_buffxstat->attr_valid & XATTR_ACL) {
+		if (use_nfs4_acl() && p_buffxstat->attr_valid & XATTR_ACL) {
 			/* ACL is valid, so try to convert fsal acl. */
 			gpfs_acl_2_fsal_acl(p_fsalattr_out,
 					    (gpfs_acl_t *) p_buffxstat->
 					    buffacl);
 		}
-#endif				/* _USE_NFS4_ACL */
 		LogFullDebug(COMPONENT_FSAL, "acl = %p", p_fsalattr_out->acl);
 	}
 	if (FSAL_TEST_MASK(p_fsalattr_out->mask, ATTR_FILEID)) {
@@ -237,7 +233,6 @@ fsal_status_t gpfsfsal_xstat_2_fsal_attributes(gpfsfsal_xstat_t *p_buffxstat,
 	return fsalstat(ERR_FSAL_NO_ERROR, 0);
 }
 
-#ifdef _USE_NFS4_ACL
 /* Covert GPFS NFS4 ACLs to FSAL ACLs, and set the ACL
  * pointer of attribute. */
 static int gpfs_acl_2_fsal_acl(struct attrlist *p_object_attributes,
@@ -451,4 +446,3 @@ fsal_status_t fsal_mode_2_gpfs_mode(mode_t fsal_mode, fsal_accessflags_t v4mask,
 
 	return fsalstat(ERR_FSAL_NO_ERROR, 0);
 }
-#endif				/* _USE_NFS4_ACL */

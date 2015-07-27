@@ -31,8 +31,6 @@
  *          defined in fsal_internal.c.
  */
 
-#define _USE_NFS4_ACL
-
 #include <sys/stat.h>
 #include "fsal.h"
 #include "gsh_list.h"
@@ -40,6 +38,11 @@
 #include "fcntl.h"
 #include "include/gpfs_nfs.h"
 #include "fsal_up.h"
+
+static inline bool use_nfs4_acl(void)
+{
+	return true;
+}
 
 struct gpfs_filesystem;
 

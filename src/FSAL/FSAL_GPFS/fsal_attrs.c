@@ -42,11 +42,9 @@
 #include <sys/time.h>
 #include "export_mgr.h"
 
-#ifdef _USE_NFS4_ACL
 extern fsal_status_t fsal_acl_2_gpfs_acl(struct fsal_obj_handle *dir_hdl,
 					 fsal_acl_t *p_fsalacl,
 					 gpfsfsal_xstat_t *p_buffxstat);
-#endif				/* _USE_NFS4_ACL */
 
 /**
  * GPFSFSAL_fs_loc:
@@ -373,12 +371,8 @@ fsal_status_t GPFSFSAL_setattrs(struct fsal_obj_handle *dir_hdl,	/* IN */
 	if (attr_changed != 0)
 		attr_valid |= XATTR_STAT;
 
-#ifdef _USE_NFS4_ACL
-   /***********
-   *  ACL  *
-   ***********/
-
-	if (FSAL_TEST_MASK(p_object_attributes->mask, ATTR_ACL)) {
+	if (use_nfs4_acl() &&
+	    FSAL_TEST_MASK(p_object_attributes->mask, ATTR_ACL)) {
 		if (p_object_attributes->acl) {
 			attr_valid |= XATTR_ACL;
 			LogDebug(COMPONENT_FSAL, "setattr acl = %p",
@@ -397,7 +391,6 @@ fsal_status_t GPFSFSAL_setattrs(struct fsal_obj_handle *dir_hdl,	/* IN */
 			return fsalstat(ERR_FSAL_FAULT, 0);
 		}
 	}
-#endif				/* _USE_NFS4_ACL */
 
 	/* If there is any change in stat or acl or both, send it down to fs. */
 	if (attr_valid != 0) {

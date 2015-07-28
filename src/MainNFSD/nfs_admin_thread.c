@@ -29,6 +29,7 @@
  * @brief The admin_thread and support code.
  */
 
+#include <dlfcn.h>
 #include "config.h"
 #include <stdio.h>
 #include <string.h>
@@ -225,10 +226,59 @@ static struct gsh_dbus_method method_purge_gids = {
 		 END_ARG_LIST}
 };
 
+extern void dump_nfsv3_stats();
+static bool admin_dbus_fsal_stats(DBusMessageIter *args,
+				  DBusMessage *reply,
+				  DBusError *error)
+{
+	char *errormsg = "Dump fsal stats";
+	bool success = true;
+	DBusMessageIter iter;
+	void (*gpfs_stats_func)(void) = NULL;
+	struct fsal_module *fsal_hdl;
+	struct root_op_context root_op_context;
+
+	dbus_message_iter_init_append(reply, &iter);
+	if (args != NULL) {
+		errormsg = "Dump fsal stats takes no arguments.";
+		success = false;
+		LogWarn(COMPONENT_DBUS, "%s", errormsg);
+		goto out;
+	}
+
+	/* Malahal: Big HACK */
+	dump_nfsv3_stats();
+	init_root_op_context(&root_op_context, NULL, NULL,
+			     0, 0, UNKNOWN_REQUEST);
+	fsal_hdl = lookup_fsal("GPFS");
+	release_root_op_context();
+	if (fsal_hdl) {
+		gpfs_stats_func = dlsym(fsal_hdl->dl_handle,
+					"dump_gpfs_fsal_stats");
+		if (gpfs_stats_func != NULL)
+			gpfs_stats_func();
+	}
+
+	if (gpfs_stats_func == NULL)
+		LogCrit(COMPONENT_NFS_CB,
+			"Unable to find dump_gpfs_fsal_stats");
+
+ out:
+	dbus_status_reply(&iter, success, errormsg);
+	return success;
+}
+static struct gsh_dbus_method method_fsal_stats = {
+	.name = "fsal_stats",
+	.method = admin_dbus_fsal_stats,
+	.args = {STATUS_REPLY,
+		 END_ARG_LIST}
+};
+
 static struct gsh_dbus_method *admin_methods[] = {
 	&method_shutdown,
 	&method_grace_period,
 	&method_purge_gids,
+	&method_fsal_stats,
 	NULL
 };
 

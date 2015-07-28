@@ -988,6 +988,61 @@ void server_stats_transport_done(struct gsh_client *client,
  * Called from nfs_rpc_execute at operation/command completion
  */
 
+struct proto_op nfsv3_stats[NFSPROC3_COMMIT+1];
+static void record_nfsv3_stats(struct svc_req *req,
+			       nsecs_elapsed_t request_time,
+			       nsecs_elapsed_t qwait_time,
+			       bool success, bool dup)
+{
+	if (req->rq_prog == nfs_param.core_param.program[P_NFS] &&
+			req->rq_vers == NFS_V3) {
+		if (req->rq_proc > NFSPROC3_COMMIT) {
+			LogCrit(COMPONENT_DBUS,
+				"req->rq_proc is more than COMMIT: %d\n",
+				req->rq_proc);
+			return;
+		}
+		record_op(&nfsv3_stats[req->rq_proc], request_time,
+				qwait_time, success, dup);
+	}
+}
+
+void dump_nfsv3_stats()
+{
+	FILE *fp;
+	int op;
+
+	fp = fopen("/tmp/nfsv3.stats", "w");
+	if (fp == NULL)
+		return;
+
+	/* less than 100 should be empty */
+	fprintf(fp, "op/total/aveOPms/aveQms/errors/dups\n"
+			"\t\t\top_time/op_min/op_max\n"
+			"\t\t\tq_time/q_min/q_max\n");
+	for (op = 1; op < NFSPROC3_COMMIT+1; op++) {
+		if (nfsv3_stats[op].total)
+			fprintf(fp,
+				"%s, \t%lu, \t%f, \t%f, \t%lu, \t%lu\n"
+				"\t\t\t %lu, \t%lu, \t%lu\n"
+				"\t\t\t %lu, \t%lu, \t%lu\n",
+				optabv3[op].name, nfsv3_stats[op].total,
+				(float)nfsv3_stats[op].latency.latency /
+					NS_PER_MSEC / nfsv3_stats[op].total,
+				(float)nfsv3_stats[op].queue_latency.latency /
+					NS_PER_MSEC / nfsv3_stats[op].total,
+				nfsv3_stats[op].errors,
+				nfsv3_stats[op].dups,
+				nfsv3_stats[op].latency.latency,
+				nfsv3_stats[op].latency.min,
+				nfsv3_stats[op].latency.max,
+				nfsv3_stats[op].queue_latency.latency,
+				nfsv3_stats[op].queue_latency.min,
+				nfsv3_stats[op].queue_latency.max);
+	}
+	fclose(fp);
+}
+
 void server_stats_nfs_done(request_data_t *reqdata, int rc, bool dup)
 {
 	struct gsh_client *client = op_ctx->client;
@@ -1010,6 +1065,8 @@ void server_stats_nfs_done(request_data_t *reqdata, int rc, bool dup)
 
 	now(&current_time);
 	stop_time = timespec_diff(&ServerBootTime, &current_time);
+	record_nfsv3_stats(req, stop_time - op_ctx->start_time,
+		    op_ctx->queue_wait, rc == NFS_REQ_OK, dup);
 	if (client != NULL) {
 		struct server_stats *server_st;
 		server_st = container_of(client, struct server_stats, client);

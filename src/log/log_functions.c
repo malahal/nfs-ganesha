@@ -916,7 +916,7 @@ int disable_log_facility(char *name)
  * @return 0 on success, -errno on errors.
  */
 
-static int set_default_log_facility(const char *name)
+int set_default_log_facility(const char *name)
 {
 	struct log_facility *facility;
 

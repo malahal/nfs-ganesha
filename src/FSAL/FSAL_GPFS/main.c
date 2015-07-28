@@ -196,7 +196,7 @@ static fsal_status_t init_config(struct fsal_module *fsal_hdl,
 			"Could not create GPFS logger (%s)",
 			strerror(-rc));
 	if (gpfs_me->fs_info.fsal_trace)
-		rc = enable_log_facility("GPFS");
+		rc = set_default_log_facility("GPFS");
 	else
 		rc = disable_log_facility("GPFS");
 	if (rc != 0)

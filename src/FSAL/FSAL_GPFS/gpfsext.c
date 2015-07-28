@@ -28,6 +28,9 @@
 #include "include/gpfs.h"
 #endif
 
+#include "common_utils.h"
+#include "abstract_atomic.h"
+
 #include "include/gpfs_nfs.h"
 
 struct kxArgs {
@@ -129,11 +132,21 @@ static void valgrind_kganesha(struct kxArgs *args)
 }
 #endif
 
+struct gpfs_stats {
+	uint64_t resp_time;
+	uint64_t num_ops;
+	uint64_t resp_time_max;
+	uint64_t resp_time_min;
+} gpfs_stats[200];
+
 int gpfs_ganesha(int op, void *oarg)
 {
 	int rc;
 	static int gpfs_fd = -1;
 	struct kxArgs args;
+	struct timespec start_time;
+	struct timespec stop_time;
+	nsecs_elapsed_t resp_time;
 
 	if (gpfs_fd < 0) {
 		gpfs_fd = open(GPFS_DEVNAMEX, O_RDONLY);
@@ -150,7 +163,42 @@ int gpfs_ganesha(int op, void *oarg)
 #ifdef _VALGRIND_MEMCHECK
 	valgrind_kganesha(&args);
 #endif
+	now(&start_time);
 	rc = ioctl(gpfs_fd, kGanesha, &args);
+	now(&stop_time);
+	resp_time = timespec_diff(&start_time, &stop_time);
+
+	/* record FSAL stats */
+	(void)atomic_inc_uint64_t(&gpfs_stats[op].num_ops);
+	(void)atomic_add_uint64_t(&gpfs_stats[op].resp_time, resp_time);
+	if (gpfs_stats[op].resp_time_max < resp_time)
+		gpfs_stats[op].resp_time_max = resp_time;
+	if (gpfs_stats[op].resp_time_min == 0 ||
+	    gpfs_stats[op].resp_time_min > resp_time)
+		gpfs_stats[op].resp_time_min = resp_time;
 
 	return rc;
+}
+
+#define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
+void dump_gpfs_fsal_stats()
+{
+	FILE *fp;
+	int op;
+
+	fp = fopen("/tmp/fsal.stats", "w");
+	if (fp == NULL)
+		return;
+
+	/* less than 100 should be empty */
+	for (op = 100; op < ARRAY_SIZE(gpfs_stats); op++) {
+		if (gpfs_stats[op].num_ops)
+			fprintf(fp,
+				"op:%u, num:%lu, resp:%lu, resp_min:%lu, resp_max:%lu\n",
+				op, gpfs_stats[op].num_ops,
+				gpfs_stats[op].resp_time,
+				gpfs_stats[op].resp_time_min,
+				gpfs_stats[op].resp_time_max);
+	}
+	fclose(fp);
 }

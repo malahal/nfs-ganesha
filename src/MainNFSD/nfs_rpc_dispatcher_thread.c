@@ -1182,7 +1182,7 @@ void nfs_rpc_queue_init(void)
 			 "Unable to initialize decoder thread pool: %d", rc);
 
 	/* queues */
-	pthread_spin_init(&nfs_req_st.reqs.sp, PTHREAD_PROCESS_PRIVATE);
+	pthread_mutex_init(&nfs_req_st.reqs.sp, NULL);
 	nfs_req_st.reqs.size = 0;
 	for (ix = 0; ix < N_REQ_QUEUES; ++ix) {
 		qpair = &(nfs_req_st.reqs.nfs_request_q.qset[ix]);
@@ -1257,10 +1257,10 @@ void nfs_rpc_enqueue_req(request_data_t *reqdata)
 	now(&reqdata->time_queued);
 	/* always append to producer queue */
 	q = &qpair->producer;
-	pthread_spin_lock(&q->sp);
+	pthread_mutex_lock(&q->sp);
 	glist_add_tail(&q->q, &reqdata->req_q);
 	++(q->size);
-	pthread_spin_unlock(&q->sp);
+	pthread_mutex_unlock(&q->sp);
 
 	atomic_inc_uint32_t(&enqueued_reqs);
 
@@ -1276,7 +1276,7 @@ void nfs_rpc_enqueue_req(request_data_t *reqdata)
 		wait_q_entry_t *wqe;
 
 		/* SPIN LOCKED */
-		pthread_spin_lock(&nfs_req_st.reqs.sp);
+		pthread_mutex_lock(&nfs_req_st.reqs.sp);
 		if (nfs_req_st.reqs.waiters) {
 			wqe = glist_first_entry(&nfs_req_st.reqs.wait_list,
 						wait_q_entry_t, waitq);
@@ -1290,7 +1290,7 @@ void nfs_rpc_enqueue_req(request_data_t *reqdata)
 			--(nfs_req_st.reqs.waiters);
 			--(wqe->waiters);
 			/* ! SPIN LOCKED */
-			pthread_spin_unlock(&nfs_req_st.reqs.sp);
+			pthread_mutex_unlock(&nfs_req_st.reqs.sp);
 			PTHREAD_MUTEX_lock(&wqe->lwe.mtx);
 			/* XXX reliable handoff */
 			wqe->flags |= Wqe_LFlag_SyncDone;
@@ -1299,7 +1299,7 @@ void nfs_rpc_enqueue_req(request_data_t *reqdata)
 			PTHREAD_MUTEX_unlock(&wqe->lwe.mtx);
 		} else
 			/* ! SPIN LOCKED */
-			pthread_spin_unlock(&nfs_req_st.reqs.sp);
+			pthread_mutex_unlock(&nfs_req_st.reqs.sp);
 	}
 
  out:
@@ -1311,21 +1311,21 @@ request_data_t *nfs_rpc_consume_req(struct req_q_pair *qpair)
 {
 	request_data_t *reqdata = NULL;
 
-	pthread_spin_lock(&qpair->consumer.sp);
+	pthread_mutex_lock(&qpair->consumer.sp);
 	if (qpair->consumer.size > 0) {
 		reqdata =
 		    glist_first_entry(&qpair->consumer.q, request_data_t,
 				      req_q);
 		glist_del(&reqdata->req_q);
 		--(qpair->consumer.size);
-		pthread_spin_unlock(&qpair->consumer.sp);
+		pthread_mutex_unlock(&qpair->consumer.sp);
 		goto out;
 	} else {
 		char *s = NULL;
 		uint32_t csize = ~0U;
 		uint32_t psize = ~0U;
 
-		pthread_spin_lock(&qpair->producer.sp);
+		pthread_mutex_lock(&qpair->producer.sp);
 		if (isFullDebug(COMPONENT_DISPATCH)) {
 			s = (char *)qpair->s;
 			csize = qpair->consumer.size;
@@ -1338,13 +1338,13 @@ request_data_t *nfs_rpc_consume_req(struct req_q_pair *qpair)
 			qpair->consumer.size = qpair->producer.size;
 			qpair->producer.size = 0;
 			/* consumer.size > 0 */
-			pthread_spin_unlock(&qpair->producer.sp);
+			pthread_mutex_unlock(&qpair->producer.sp);
 			reqdata =
 			    glist_first_entry(&qpair->consumer.q,
 					      request_data_t, req_q);
 			glist_del(&reqdata->req_q);
 			--(qpair->consumer.size);
-			pthread_spin_unlock(&qpair->consumer.sp);
+			pthread_mutex_unlock(&qpair->consumer.sp);
 			if (s)
 				LogFullDebug(COMPONENT_DISPATCH,
 					     "try splice, qpair %s consumer qsize=%u producer qsize=%u",
@@ -1352,8 +1352,8 @@ request_data_t *nfs_rpc_consume_req(struct req_q_pair *qpair)
 			goto out;
 		}
 
-		pthread_spin_unlock(&qpair->producer.sp);
-		pthread_spin_unlock(&qpair->consumer.sp);
+		pthread_mutex_unlock(&qpair->producer.sp);
+		pthread_mutex_unlock(&qpair->consumer.sp);
 
 		if (s)
 			LogFullDebug(COMPONENT_DISPATCH,
@@ -1429,10 +1429,10 @@ request_data_t *nfs_rpc_dequeue_req(nfs_worker_data_t *worker)
 		wqe->flags = Wqe_LFlag_WaitSync;
 		wqe->waiters = 1;
 		/* XXX functionalize */
-		pthread_spin_lock(&nfs_req_st.reqs.sp);
+		pthread_mutex_lock(&nfs_req_st.reqs.sp);
 		glist_add_tail(&nfs_req_st.reqs.wait_list, &wqe->waitq);
 		++(nfs_req_st.reqs.waiters);
-		pthread_spin_unlock(&nfs_req_st.reqs.sp);
+		pthread_mutex_unlock(&nfs_req_st.reqs.sp);
 		while (!(wqe->flags & Wqe_LFlag_SyncDone)) {
 			timeout.tv_sec = time(NULL) + 5;
 			timeout.tv_nsec = 0;
@@ -1441,7 +1441,7 @@ request_data_t *nfs_rpc_dequeue_req(nfs_worker_data_t *worker)
 			if (fridgethr_you_should_break(ctx)) {
 				/* We are returning;
 				 * so take us out of the waitq */
-				pthread_spin_lock(&nfs_req_st.reqs.sp);
+				pthread_mutex_lock(&nfs_req_st.reqs.sp);
 				if (wqe->waitq.next != NULL
 				    || wqe->waitq.prev != NULL) {
 					/* Element is still in wqitq,
@@ -1453,7 +1453,7 @@ request_data_t *nfs_rpc_dequeue_req(nfs_worker_data_t *worker)
 					    ~(Wqe_LFlag_WaitSync |
 					      Wqe_LFlag_SyncDone);
 				}
-				pthread_spin_unlock(&nfs_req_st.reqs.sp);
+				pthread_mutex_unlock(&nfs_req_st.reqs.sp);
 				PTHREAD_MUTEX_unlock(&wqe->lwe.mtx);
 				return NULL;
 			}

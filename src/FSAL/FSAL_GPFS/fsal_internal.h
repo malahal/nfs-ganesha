@@ -31,8 +31,6 @@
  *          defined in fsal_internal.c.
  */
 
-#define _USE_NFS4_ACL
-
 #include <sys/stat.h>
 #include "fsal.h"
 #include "gsh_list.h"

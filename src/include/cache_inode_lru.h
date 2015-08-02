@@ -133,7 +133,7 @@ extern struct lru_state lru_state;
  * The number of lanes comprising a logical queue.  This must be
  * prime.
  */
-#define LRU_N_Q_LANES  17
+#define LRU_N_Q_LANES  1031
 
 extern int cache_inode_lru_pkginit(void);
 extern int cache_inode_lru_pkgshutdown(void);

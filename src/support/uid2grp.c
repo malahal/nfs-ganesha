@@ -252,32 +252,32 @@ bool name2grp(const struct gsh_buffdesc *name, struct group_data **gdata)
 	bool success = false;
 	uid_t uid = -1;
 
-	PTHREAD_RWLOCK_rdlock(&uid2grp_user_lock);
+	pthread_rwlock_rdlock(&uid2grp_user_lock);
 	success = uid2grp_lookup_by_uname(name, &uid, gdata);
 
 	/* Handle common case first */
 	if (success && !uid2grp_expired(*gdata)) {
 		uid2grp_hold_group_data(*gdata);
-		PTHREAD_RWLOCK_unlock(&uid2grp_user_lock);
+		pthread_rwlock_unlock(&uid2grp_user_lock);
 		return success;
 	}
-	PTHREAD_RWLOCK_unlock(&uid2grp_user_lock);
+	pthread_rwlock_unlock(&uid2grp_user_lock);
 
 	if (success) {
 		/* Cache entry is expired */
-		PTHREAD_RWLOCK_wrlock(&uid2grp_user_lock);
+		pthread_rwlock_wrlock(&uid2grp_user_lock);
 		uid2grp_remove_by_uname(name);
-		PTHREAD_RWLOCK_unlock(&uid2grp_user_lock);
+		pthread_rwlock_unlock(&uid2grp_user_lock);
 	}
 
 	*gdata = uid2grp_allocate_by_name(name);
-	PTHREAD_RWLOCK_wrlock(&uid2grp_user_lock);
+	pthread_rwlock_wrlock(&uid2grp_user_lock);
 	if (*gdata)
 		uid2grp_add_user(*gdata);
 	success = uid2grp_lookup_by_uname(name, &uid, gdata);
 	if (success)
 		uid2grp_hold_group_data(*gdata);
-	PTHREAD_RWLOCK_unlock(&uid2grp_user_lock);
+	pthread_rwlock_unlock(&uid2grp_user_lock);
 
 	return success;
 }
@@ -294,32 +294,32 @@ bool uid2grp(uid_t uid, struct group_data **gdata)
 {
 	bool success = false;
 
-	PTHREAD_RWLOCK_rdlock(&uid2grp_user_lock);
+	pthread_rwlock_rdlock(&uid2grp_user_lock);
 	success = uid2grp_lookup_by_uid(uid, gdata);
 
 	/* Handle common case first */
 	if (success && !uid2grp_expired(*gdata)) {
 		uid2grp_hold_group_data(*gdata);
-		PTHREAD_RWLOCK_unlock(&uid2grp_user_lock);
+		pthread_rwlock_unlock(&uid2grp_user_lock);
 		return success;
 	}
-	PTHREAD_RWLOCK_unlock(&uid2grp_user_lock);
+	pthread_rwlock_unlock(&uid2grp_user_lock);
 
 	if (success) {
 		/* Cache entry is expired */
-		PTHREAD_RWLOCK_wrlock(&uid2grp_user_lock);
+		pthread_rwlock_wrlock(&uid2grp_user_lock);
 		uid2grp_remove_by_uid(uid);
-		PTHREAD_RWLOCK_unlock(&uid2grp_user_lock);
+		pthread_rwlock_unlock(&uid2grp_user_lock);
 	}
 
 	*gdata = uid2grp_allocate_by_uid(uid);
-	PTHREAD_RWLOCK_wrlock(&uid2grp_user_lock);
+	pthread_rwlock_wrlock(&uid2grp_user_lock);
 	if (*gdata)
 		uid2grp_add_user(*gdata);
 	success = uid2grp_lookup_by_uid(uid, gdata);
 	if (success)
 		uid2grp_hold_group_data(*gdata);
-	PTHREAD_RWLOCK_unlock(&uid2grp_user_lock);
+	pthread_rwlock_unlock(&uid2grp_user_lock);
 
 	return success;
 }

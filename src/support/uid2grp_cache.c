@@ -423,7 +423,7 @@ void uid2grp_clear_cache(void)
 {
 	struct avltree_node *node;
 
-	PTHREAD_RWLOCK_wrlock(&uid2grp_user_lock);
+	pthread_rwlock_wrlock(&uid2grp_user_lock);
 
 	while ((node = avltree_first(&uname_tree))) {
 		struct cache_info *info = avltree_container_of(node,
@@ -435,7 +435,7 @@ void uid2grp_clear_cache(void)
 
 	assert(avltree_first(&uid_tree) == NULL);
 
-	PTHREAD_RWLOCK_unlock(&uid2grp_user_lock);
+	pthread_rwlock_unlock(&uid2grp_user_lock);
 }
 
 /** @} */

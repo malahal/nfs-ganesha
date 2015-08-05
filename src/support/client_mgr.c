@@ -162,7 +162,7 @@ struct gsh_client *get_gsh_client(sockaddr_t *client_ipaddr, bool lookup_only)
 	v.addr.addr = addr;
 	v.addr.len = addr_len;
 
-	PTHREAD_RWLOCK_rdlock(&client_by_ip.lock);
+	pthread_rwlock_rdlock(&client_by_ip.lock);
 
 	/* check cache */
 	cache_slot = (void **)
@@ -188,10 +188,10 @@ struct gsh_client *get_gsh_client(sockaddr_t *client_ipaddr, bool lookup_only)
 		atomic_store_voidptr(cache_slot, node);
 		goto out;
 	} else if (lookup_only) {
-		PTHREAD_RWLOCK_unlock(&client_by_ip.lock);
+		pthread_rwlock_unlock(&client_by_ip.lock);
 		return NULL;
 	}
-	PTHREAD_RWLOCK_unlock(&client_by_ip.lock);
+	pthread_rwlock_unlock(&client_by_ip.lock);
 
 	server_st = gsh_calloc(1, (sizeof(struct server_stats) + addr_len));
 
@@ -206,18 +206,18 @@ struct gsh_client *get_gsh_client(sockaddr_t *client_ipaddr, bool lookup_only)
 	sprint_sockip(client_ipaddr, hoststr, SOCK_NAME_MAX);
 	cl->hostaddr_str = gsh_strdup(hoststr);
 
-	PTHREAD_RWLOCK_wrlock(&client_by_ip.lock);
+	pthread_rwlock_wrlock(&client_by_ip.lock);
 	node = avltree_insert(&cl->node_k, &client_by_ip.t);
 	if (node) {
 		gsh_free(server_st);	/* somebody beat us to it */
 		cl = avltree_container_of(node, struct gsh_client, node_k);
 	} else {
-		PTHREAD_RWLOCK_init(&cl->lock, NULL);
+		pthread_rwlock_init(&cl->lock, NULL);
 	}
 
  out:
 	inc_gsh_client_refcount(cl);
-	PTHREAD_RWLOCK_unlock(&client_by_ip.lock);
+	pthread_rwlock_unlock(&client_by_ip.lock);
 	return cl;
 }
 
@@ -283,7 +283,7 @@ int remove_gsh_client(sockaddr_t *client_ipaddr)
 	v.addr.addr = addr;
 	v.addr.len = addr_len;
 
-	PTHREAD_RWLOCK_wrlock(&client_by_ip.lock);
+	pthread_rwlock_wrlock(&client_by_ip.lock);
 	node = avltree_lookup(&v.node_k, &client_by_ip.t);
 	if (node) {
 		cl = avltree_container_of(node, struct gsh_client, node_k);
@@ -302,7 +302,7 @@ int remove_gsh_client(sockaddr_t *client_ipaddr)
 		removed = ENOENT;
 	}
  out:
-	PTHREAD_RWLOCK_unlock(&client_by_ip.lock);
+	pthread_rwlock_unlock(&client_by_ip.lock);
 	if (removed == 0) {
 		server_st = container_of(cl, struct server_stats, client);
 		server_stats_free(&server_st->st);
@@ -327,7 +327,7 @@ int foreach_gsh_client(bool(*cb) (struct gsh_client *cl, void *state),
 	struct gsh_client *cl;
 	int cnt = 0;
 
-	PTHREAD_RWLOCK_rdlock(&client_by_ip.lock);
+	pthread_rwlock_rdlock(&client_by_ip.lock);
 	for (client_node = avltree_first(&client_by_ip.t); client_node != NULL;
 	     client_node = avltree_next(client_node)) {
 		cl = avltree_container_of(client_node, struct gsh_client,
@@ -336,7 +336,7 @@ int foreach_gsh_client(bool(*cb) (struct gsh_client *cl, void *state),
 			break;
 		cnt++;
 	}
-	PTHREAD_RWLOCK_unlock(&client_by_ip.lock);
+	pthread_rwlock_unlock(&client_by_ip.lock);
 	return cnt;
 }
 
@@ -997,7 +997,7 @@ void client_pkginit(void)
 		&rwlock_attr,
 		PTHREAD_RWLOCK_PREFER_WRITER_NONRECURSIVE_NP);
 #endif
-	PTHREAD_RWLOCK_init(&client_by_ip.lock, &rwlock_attr);
+	pthread_rwlock_init(&client_by_ip.lock, &rwlock_attr);
 	avltree_init(&client_by_ip.t, client_ip_cmpf, 0);
 	client_by_ip.cache_sz = 32767;
 	client_by_ip.cache =

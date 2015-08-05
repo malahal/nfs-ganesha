@@ -116,7 +116,11 @@ retry_lock:
 	else {
 		if (src < dest) {
 			PTHREAD_RWLOCK_wrlock(&src->content_lock);
+#ifdef DEBUG_STATS
+			rc = pthread_rwlock_trywrlock(&dest->content_lock.lock);
+#else
 			rc = pthread_rwlock_trywrlock(&dest->content_lock);
+#endif
 			if (rc) {
 				LogDebug(COMPONENT_CACHE_INODE,
 						"retry dest %p lock, src %p",
@@ -127,7 +131,11 @@ retry_lock:
 			}
 		} else {
 			PTHREAD_RWLOCK_wrlock(&dest->content_lock);
+#ifdef DEBUG_STATS
+			rc = pthread_rwlock_trywrlock(&src->content_lock.lock);
+#else
 			rc = pthread_rwlock_trywrlock(&src->content_lock);
+#endif
 			if (rc) {
 				LogDebug(COMPONENT_CACHE_INODE,
 						"retry src %p lock, dest %p",

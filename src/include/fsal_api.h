@@ -2218,7 +2218,7 @@ struct fsal_module {
 				   library. NULL if statically linked */
 	struct fsal_ops m_ops;	/*< FSAL module methods vector */
 
-	pthread_rwlock_t lock;		/*< Lock to be held when
+	mutex_rwlock_t lock;		/*< Lock to be held when
 					    manipulating its lists (above). */
 	int32_t refcount;		/*< Reference count */
 };
@@ -2326,7 +2326,7 @@ struct fsal_obj_handle {
 	struct fsal_module *fsal;	/*< Link back to fsal module */
 	struct fsal_obj_ops obj_ops;	/*< Operations vector */
 
-	pthread_rwlock_t lock;		/*< Lock on handle */
+	mutex_rwlock_t lock;		/*< Lock on handle */
 
 	/** Pointer to the cached attributes.
 	 *
@@ -2368,7 +2368,7 @@ struct fsal_pnfs_ds {
 	struct gsh_export *mds_export;	/*< related export */
 
 	struct avltree_node ds_node;	/*< Node in tree of all Data Servers. */
-	pthread_rwlock_t lock;		/*< Lock to be held when
+	mutex_rwlock_t lock;		/*< Lock to be held when
 					    manipulating its list (above). */
 	int32_t refcount;		/*< Reference count */
 	uint16_t id_servers;		/*< Identifier */

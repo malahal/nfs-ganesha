@@ -148,18 +148,7 @@ fsal_acl_t *nfs4_acl_new_entry(fsal_acl_data_t *acldata,
 
 	/* Adding the entry in the cache */
 	acl = nfs4_acl_alloc();
-	if (pthread_rwlock_init(&(acl->lock), NULL) != 0) {
-		nfs4_acl_free(acl);
-		LogCrit(COMPONENT_NFS_V4_ACL,
-			"New ACL RW lock init returned %d (%s)", errno,
-			strerror(errno));
-		*status = NFS_V4_ACL_INIT_ENTRY_FAILED;
-
-		nfs4_ace_free(acldata->aces);
-		hashtable_releaselatched(fsal_acl_hash, &latch);
-
-		return NULL;
-	}
+	PTHREAD_RWLOCK_init(&(acl->lock), NULL);
 
 	acl->naces = acldata->naces;
 	acl->aces = acldata->aces;

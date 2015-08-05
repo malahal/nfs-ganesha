@@ -61,7 +61,7 @@
  */
 typedef struct cih_partition {
 	uint32_t part_ix;
-	pthread_rwlock_t lock;
+	mutex_rwlock_t lock;
 	struct avltree t;
 	struct avltree_node **cache;
 	struct {

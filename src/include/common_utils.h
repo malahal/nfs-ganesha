@@ -82,6 +82,328 @@ extern int portable_clock_gettime(struct timespec *ts);
 #define SCANDIR_CONST
 #endif
 
+#define DEBUG_STATS
+typedef struct {
+	pthread_rwlock_t lock;
+#ifdef DEBUG_STATS
+	struct timespec start;
+	struct timespec total;
+	uint64_t diff;
+	long count;
+#endif
+} mutex_rwlock_t;
+
+#ifdef DEBUG_STATS
+/**
+ * @brief Logging rwlock initialization
+ *
+ * @param[in,out] _lock The rwlock to initialize
+ * @param[in,out] _attr The attributes used while initializing the lock
+ */
+#define PTHREAD_RWLOCK_init(_lock, _attr)				\
+	do {								\
+		int rc;							\
+		pthread_rwlock_t *zlock;				\
+		mutex_rwlock_t   *xlock;				\
+		zlock = _lock.lock;					\
+		xlock = _lock;						\
+									\
+		xlock->count = 0;					\
+		xlock->total.tv_sec = 0;				\
+		xlock->total.tv_nsec = 0;				\
+		rc = pthread_rwlock_init(zlock, _attr);			\
+		if (rc == 0) {						\
+			LogFullDebug(COMPONENT_RW_LOCK,			\
+				     "Init rwlock %p (%s) at %s:%d",	\
+				     _lock, #_lock,			\
+				     __FILE__, __LINE__);		\
+		} else {						\
+			LogCrit(COMPONENT_RW_LOCK,			\
+				"Error %d, Init rwlock %p (%s) "	\
+				"at %s:%d", rc, _lock, #_lock,		\
+				__FILE__, __LINE__);			\
+			abort();					\
+		}							\
+	} while (0)
+
+/**
+ * @brief Logging rwlock destroy
+ *
+ * @param[in,out] _lock The rwlock to destroy
+ */
+#define PTHREAD_RWLOCK_destroy(_lock)					\
+	do {								\
+		int rc;							\
+		pthread_rwlock_t *zlock;				\
+		zlock = _lock.lock;					\
+									\
+		rc = pthread_rwlock_destroy(zlock);			\
+		if (rc == 0) {						\
+			LogFullDebug(COMPONENT_RW_LOCK,			\
+				     "Destroy mutex %p (%s) at %s:%d",	\
+				     _lock, #_lock,			\
+				     __FILE__, __LINE__);		\
+		} else {						\
+			LogCrit(COMPONENT_RW_LOCK,			\
+				"Error %d, Destroy mutex %p (%s) "	\
+				"at %s:%d", rc, _lock, #_lock,		\
+				__FILE__, __LINE__);			\
+			abort();					\
+		}							\
+	} while (0)
+
+/**
+ * @brief Logging write-lock
+ *
+ * @param[in,out] _lock Read-write lock
+ */
+
+#define PTHREAD_RWLOCK_wrlock(_lock)					\
+	do {								\
+		int rc;							\
+		pthread_rwlock_t *zlock;				\
+		mutex_rwlock_t   *xlock;				\
+		zlock = _lock.lock;					\
+		xlock = _lock;						\
+									\
+		rc = pthread_rwlock_wrlock(zlock);			\
+		if (rc == 0) {						\
+			xlock->count += 1;				\
+			now(&(xlock->start));				\
+			LogFullDebug(COMPONENT_RW_LOCK,			\
+				     "Got write lock on %p (%s) "	\
+				     "at %s:%d", _lock, #_lock,		\
+				     __FILE__, __LINE__);		\
+		} else {						\
+			LogCrit(COMPONENT_RW_LOCK,			\
+				"Error %d, write locking %p (%s) "	\
+				"at %s:%d", rc, _lock, #_lock,		\
+				__FILE__, __LINE__);			\
+			abort();					\
+		}							\
+	} while (0)							\
+
+/**
+ * @brief Logging read-lock
+ *
+ * @param[in,out] _lock Read-write lock
+ */
+
+#define PTHREAD_RWLOCK_rdlock(_lock)					\
+	do {								\
+		int rc;							\
+		pthread_rwlock_t *zlock;				\
+		zlock = _lock.lock;					\
+                mutex_rwlock_t   *xlock;                                \
+                xlock = _lock;                                          \
+									\
+		rc = pthread_rwlock_rdlock(zlock);			\
+		if (rc == 0) {						\
+                        xlock->count += 1;                              \
+                        now(&(xlock->start));                           \
+			LogFullDebug(COMPONENT_RW_LOCK,			\
+				     "Got read lock on %p (%s) "	\
+				     "at %s:%d", _lock, #_lock,		\
+				     __FILE__, __LINE__);		\
+		} else {						\
+			LogCrit(COMPONENT_RW_LOCK,			\
+				"Error %d, read locking %p (%s) "	\
+				"at %s:%d", rc, _lock, #_lock,		\
+				__FILE__, __LINE__);			\
+			abort();					\
+		}							\
+	} while (0)							\
+
+/**
+ * @brief Logging read-write lock unlock
+ *
+ * @param[in,out] _lock Read-write lock
+ */
+
+#define PTHREAD_RWLOCK_unlock(_lock)					\
+	do {								\
+		int rc;							\
+		struct timespec stop;					\
+		pthread_rwlock_t *zlock;				\
+		zlock = _lock.lock;					\
+		mutex_rwlock_t   *xlock;				\
+		xlock = _lock;						\
+									\
+		now(&stop);						\
+		xlock->diff += timespec_diff(&(xlock->start), &stop);	\
+		timespec_add_nsecs(xlock->diff, &xlock->total);		\
+		rc = pthread_rwlock_unlock(zlock);			\
+		if (rc == 0) {						\
+			LogDebug(COMPONENT_RW_LOCK,			\
+			     "Unlocked %p (%s) at %s:%d cnt %ld diff %lu total %lu:%lu",\
+			     _lock, #_lock, __FILE__, __LINE__,		\
+			     xlock->count, xlock->diff,			\
+			     xlock->total.tv_sec, xlock->total.tv_nsec);\
+			LogFullDebug(COMPONENT_RW_LOCK,			\
+				     "Unlocked %p (%s) at %s:%d",       \
+				     _lock, #_lock,			\
+				     __FILE__, __LINE__);		\
+		} else {						\
+			LogCrit(COMPONENT_RW_LOCK,			\
+				"Error %d, unlocking %p (%s) at %s:%d",	\
+				rc, _lock, #_lock,			\
+				__FILE__, __LINE__);			\
+			abort();					\
+		}							\
+	} while (0)							\
+
+/**
+ * @brief Logging mutex lock
+ *
+ * @param[in,out] _mtx The mutex to acquire
+ */
+
+#define PTHREAD_MUTEX_lock(_mtx)					\
+	do {								\
+		int rc;							\
+									\
+		rc = pthread_mutex_lock(_mtx);				\
+		if (rc == 0) {						\
+			LogFullDebug(COMPONENT_RW_LOCK,			\
+				     "Acquired mutex %p (%s) at %s:%d",	\
+				     _mtx, #_mtx,			\
+				     __FILE__, __LINE__);		\
+		} else{							\
+			LogCrit(COMPONENT_RW_LOCK,			\
+				"Error %d, acquiring mutex %p (%s) "	\
+				"at %s:%d", rc, _mtx, #_mtx,		\
+				__FILE__, __LINE__);			\
+			abort();					\
+		}							\
+	} while (0)
+
+/**
+ * @brief Logging mutex unlock
+ *
+ * @param[in,out] _mtx The mutex to relinquish
+ */
+
+#define PTHREAD_MUTEX_unlock(_mtx)					\
+	do {								\
+		int rc;							\
+									\
+		rc = pthread_mutex_unlock(_mtx);			\
+		if (rc == 0) {						\
+			LogFullDebug(COMPONENT_RW_LOCK,			\
+				     "Released mutex %p (%s) at %s:%d",	\
+				     _mtx, #_mtx,			\
+				     __FILE__, __LINE__);		\
+		} else{							\
+			LogCrit(COMPONENT_RW_LOCK,			\
+				"Error %d, releasing mutex %p (%s) "	\
+				"at %s:%d", rc, _mtx, #_mtx,		\
+				__FILE__, __LINE__);			\
+			abort();					\
+		}							\
+	} while (0)
+
+/**
+ * @brief Logging mutex initialization
+ *
+ * @param[in,out] _mtx The mutex to initialize
+ * @param[in,out] _attr The attributes used while initializing the mutex
+ */
+#define PTHREAD_MUTEX_init(_mtx, _attr)					\
+	do {								\
+		int rc;							\
+									\
+		rc = pthread_mutex_init(_mtx, _attr);			\
+		if (rc == 0) {						\
+			LogFullDebug(COMPONENT_RW_LOCK,			\
+				     "Init mutex %p (%s) at %s:%d",	\
+				     _mtx, #_mtx,			\
+				     __FILE__, __LINE__);		\
+		} else {						\
+			LogCrit(COMPONENT_RW_LOCK,			\
+				"Error %d, Init mutex %p (%s) "		\
+				"at %s:%d", rc, _mtx, #_mtx,		\
+				__FILE__, __LINE__);			\
+			abort();					\
+		}							\
+	} while (0)
+
+/**
+ * @brief Logging mutex destroy
+ *
+ * @param[in,out] _mtx The mutex to destroy
+ */
+
+#define PTHREAD_MUTEX_destroy(_mtx)					\
+	do {								\
+		int rc;							\
+									\
+		rc = pthread_mutex_destroy(_mtx);			\
+		if (rc == 0) {						\
+			LogFullDebug(COMPONENT_RW_LOCK,			\
+				     "Destroy mutex %p (%s) at %s:%d",	\
+				     _mtx, #_mtx,			\
+				     __FILE__, __LINE__);		\
+		} else {						\
+			LogCrit(COMPONENT_RW_LOCK,			\
+				"Error %d, Destroy mutex %p (%s) "	\
+				"at %s:%d", rc, _mtx, #_mtx,		\
+				__FILE__, __LINE__);			\
+			abort();					\
+		}							\
+	} while (0)
+
+/**
+ * @brief Logging condition variable initialization
+ *
+ * @param[in,out] _cond The condition variable to initialize
+ * @param[in,out] _attr The attributes used while initializing the
+ *			condition variable
+ */
+#define PTHREAD_COND_init(_cond, _attr)					\
+	do {								\
+		int rc;							\
+									\
+		rc = pthread_cond_init(_cond, _attr);			\
+		if (rc == 0) {						\
+			LogFullDebug(COMPONENT_RW_LOCK,			\
+				     "Init cond %p (%s) at %s:%d",	\
+				     _cond, #_cond,			\
+				     __FILE__, __LINE__);		\
+		} else {						\
+			LogCrit(COMPONENT_RW_LOCK,			\
+				"Error %d, Init cond %p (%s) "		\
+				"at %s:%d", rc, _cond, #_cond,		\
+				__FILE__, __LINE__);			\
+			abort();					\
+		}							\
+	} while (0)
+
+/**
+ * @brief Logging condtion variable destroy
+ *
+ * @param[in,out] _cond The condition variable to destroy
+ */
+
+#define PTHREAD_COND_destroy(_cond)					\
+	do {								\
+		int rc;							\
+									\
+		rc = pthread_cond_destroy(_cond);			\
+		if (rc == 0) {						\
+			LogFullDebug(COMPONENT_RW_LOCK,			\
+				     "Destroy cond %p (%s) at %s:%d",	\
+				     _cond, #_cond,			\
+				     __FILE__, __LINE__);		\
+		} else {						\
+			LogCrit(COMPONENT_RW_LOCK,			\
+				"Error %d, Destroy cond %p (%s) "	\
+				"at %s:%d", rc, _cond, #_cond,		\
+				__FILE__, __LINE__);			\
+			abort();					\
+		}							\
+	} while (0)
+
+#else
 /**
  * @brief Logging rwlock initialization
  *
@@ -98,7 +420,7 @@ extern int portable_clock_gettime(struct timespec *ts);
 				     "Init rwlock %p (%s) at %s:%d",	\
 				     _lock, #_lock,			\
 				     __FILE__, __LINE__);		\
-		} else {						\
+		} else {							\
 			LogCrit(COMPONENT_RW_LOCK,			\
 				"Error %d, Init rwlock %p (%s) "	\
 				"at %s:%d", rc, _lock, #_lock,		\
@@ -357,6 +679,7 @@ extern int portable_clock_gettime(struct timespec *ts);
 		}							\
 	} while (0)
 
+#endif /* DEBUG_STATS */
 /**
  * @brief Inline functions for timespec math
  *

@@ -47,6 +47,7 @@
 #include "log.h"
 #include "abstract_mem.h"
 #include "gsh_types.h"
+#include "common_utils.h"
 
 /**
  * @brief A pair of buffer descriptors
@@ -147,7 +148,7 @@ typedef struct hash_stat {
 struct hash_partition {
 	size_t count; /*< Numer of entries in this partition */
 	struct rbt_head rbt; /*< The red-black tree */
-	pthread_rwlock_t lock; /*< Lock for this partition */
+	mutex_rwlock_t lock; /*< Lock for this partition */
 	struct rbt_node **cache; /*< Expected entry cache */
 };
 

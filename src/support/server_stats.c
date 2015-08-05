@@ -450,11 +450,11 @@ static struct nfsv3_stats *get_v3(struct gsh_stats *stats,
 				  pthread_rwlock_t *lock)
 {
 	if (unlikely(stats->nfsv3 == NULL)) {
-		PTHREAD_RWLOCK_wrlock(lock);
+		pthread_rwlock_wrlock(lock);
 		if (stats->nfsv3 == NULL)
 			stats->nfsv3 =
 			    gsh_calloc(sizeof(struct nfsv3_stats), 1);
-		PTHREAD_RWLOCK_unlock(lock);
+		pthread_rwlock_unlock(lock);
 	}
 	return stats->nfsv3;
 }
@@ -463,10 +463,10 @@ static struct mnt_stats *get_mnt(struct gsh_stats *stats,
 				 pthread_rwlock_t *lock)
 {
 	if (unlikely(stats->mnt == NULL)) {
-		PTHREAD_RWLOCK_wrlock(lock);
+		pthread_rwlock_wrlock(lock);
 		if (stats->mnt == NULL)
 			stats->mnt = gsh_calloc(sizeof(struct mnt_stats), 1);
-		PTHREAD_RWLOCK_unlock(lock);
+		pthread_rwlock_unlock(lock);
 	}
 	return stats->mnt;
 }
@@ -475,10 +475,10 @@ static struct nlmv4_stats *get_nlm4(struct gsh_stats *stats,
 				    pthread_rwlock_t *lock)
 {
 	if (unlikely(stats->nlm4 == NULL)) {
-		PTHREAD_RWLOCK_wrlock(lock);
+		pthread_rwlock_wrlock(lock);
 		if (stats->nlm4 == NULL)
 			stats->nlm4 = gsh_calloc(sizeof(struct nlmv4_stats), 1);
-		PTHREAD_RWLOCK_unlock(lock);
+		pthread_rwlock_unlock(lock);
 	}
 	return stats->nlm4;
 }
@@ -487,11 +487,11 @@ static struct rquota_stats *get_rquota(struct gsh_stats *stats,
 				       pthread_rwlock_t *lock)
 {
 	if (unlikely(stats->rquota == NULL)) {
-		PTHREAD_RWLOCK_wrlock(lock);
+		pthread_rwlock_wrlock(lock);
 		if (stats->rquota == NULL)
 			stats->rquota =
 			    gsh_calloc(sizeof(struct rquota_stats), 1);
-		PTHREAD_RWLOCK_unlock(lock);
+		pthread_rwlock_unlock(lock);
 	}
 	return stats->rquota;
 }
@@ -500,11 +500,11 @@ static struct nfsv40_stats *get_v40(struct gsh_stats *stats,
 				    pthread_rwlock_t *lock)
 {
 	if (unlikely(stats->nfsv40 == NULL)) {
-		PTHREAD_RWLOCK_wrlock(lock);
+		pthread_rwlock_wrlock(lock);
 		if (stats->nfsv40 == NULL)
 			stats->nfsv40 =
 			    gsh_calloc(sizeof(struct nfsv40_stats), 1);
-		PTHREAD_RWLOCK_unlock(lock);
+		pthread_rwlock_unlock(lock);
 	}
 	return stats->nfsv40;
 }
@@ -513,11 +513,11 @@ static struct nfsv41_stats *get_v41(struct gsh_stats *stats,
 				    pthread_rwlock_t *lock)
 {
 	if (unlikely(stats->nfsv41 == NULL)) {
-		PTHREAD_RWLOCK_wrlock(lock);
+		pthread_rwlock_wrlock(lock);
 		if (stats->nfsv41 == NULL)
 			stats->nfsv41 =
 			    gsh_calloc(sizeof(struct nfsv41_stats), 1);
-		PTHREAD_RWLOCK_unlock(lock);
+		pthread_rwlock_unlock(lock);
 	}
 	return stats->nfsv41;
 }
@@ -526,11 +526,11 @@ static struct nfsv41_stats *get_v42(struct gsh_stats *stats,
 				    pthread_rwlock_t *lock)
 {
 	if (unlikely(stats->nfsv42 == NULL)) {
-		PTHREAD_RWLOCK_wrlock(lock);
+		pthread_rwlock_wrlock(lock);
 		if (stats->nfsv42 == NULL)
 			stats->nfsv42 =
 			    gsh_calloc(sizeof(struct nfsv41_stats), 1);
-		PTHREAD_RWLOCK_unlock(lock);
+		pthread_rwlock_unlock(lock);
 	}
 	return stats->nfsv42;
 }
@@ -539,10 +539,10 @@ static struct nfsv41_stats *get_v42(struct gsh_stats *stats,
 static struct _9p_stats *get_9p(struct gsh_stats *stats, pthread_rwlock_t *lock)
 {
 	if (unlikely(stats->_9p == NULL)) {
-		PTHREAD_RWLOCK_wrlock(lock);
+		pthread_rwlock_wrlock(lock);
 		if (stats->_9p == NULL)
 			stats->_9p = gsh_calloc(sizeof(struct _9p_stats), 1);
-		PTHREAD_RWLOCK_unlock(lock);
+		pthread_rwlock_unlock(lock);
 	}
 	return stats->_9p;
 }
@@ -1021,7 +1021,7 @@ void server_stats_9p_done(u8 opc, struct _9p_request_data *req9p)
 
 		export = op_ctx->export;
 		exp_st = container_of(export, struct export_stats, export);
-		sp = get_9p(&exp_st->st, &export->lock);
+		sp = get_9p(&exp_st->st, &export->lock.lock);
 		if (sp != NULL) {
 			if (sp->opcodes[opc] == NULL)
 				sp->opcodes[opc] =
@@ -1133,7 +1133,7 @@ void server_stats_nfs_done(request_data_t *reqdata, int rc, bool dup)
 
 		exp_st =
 		    container_of(op_ctx->export, struct export_stats, export);
-		record_stats(&exp_st->st, &op_ctx->export->lock, reqdata,
+		record_stats(&exp_st->st, &op_ctx->export->lock.lock, reqdata,
 			     stop_time - op_ctx->start_time,
 			     op_ctx->queue_wait, rc == NFS_REQ_OK, dup, false);
 		(void)atomic_store_uint64_t(&op_ctx->export->last_update,
@@ -1188,7 +1188,7 @@ void server_stats_nfsv4_op_done(int proto_op,
 
 		exp_st =
 		    container_of(op_ctx->export, struct export_stats, export);
-		record_nfsv4_op(&exp_st->st, &op_ctx->export->lock, proto_op,
+		record_nfsv4_op(&exp_st->st, &op_ctx->export->lock.lock, proto_op,
 				op_ctx->nfs_minorvers, stop_time - start_time,
 				op_ctx->queue_wait, status);
 		(void)atomic_store_uint64_t(&op_ctx->export->last_update,
@@ -1225,7 +1225,7 @@ void server_stats_compound_done(int num_ops, int status)
 
 		exp_st =
 		    container_of(op_ctx->export, struct export_stats, export);
-		record_compound(&exp_st->st, &op_ctx->export->lock,
+		record_compound(&exp_st->st, &op_ctx->export->lock.lock,
 				op_ctx->nfs_minorvers, num_ops,
 				stop_time - op_ctx->start_time,
 				op_ctx->queue_wait, status == NFS4_OK);
@@ -1258,7 +1258,7 @@ void server_stats_io_done(size_t requested,
 
 		exp_st =
 		    container_of(op_ctx->export, struct export_stats, export);
-		record_io_stats(&exp_st->st, &op_ctx->export->lock,
+		record_io_stats(&exp_st->st, &op_ctx->export->lock.lock,
 				requested, transferred, success, is_write);
 	}
 }
@@ -1271,11 +1271,11 @@ void server_stats_io_done(size_t requested,
 void check_deleg_struct(struct gsh_stats *stats, pthread_rwlock_t *lock)
 {
 	if (unlikely(stats->deleg == NULL)) {
-		PTHREAD_RWLOCK_wrlock(lock);
+		pthread_rwlock_wrlock(lock);
 		if (stats->deleg == NULL)
 			stats->deleg = gsh_calloc(
 					sizeof(struct deleg_stats), 1);
-		PTHREAD_RWLOCK_unlock(lock);
+		pthread_rwlock_unlock(lock);
 	}
 }
 void inc_grants(struct gsh_client *client)

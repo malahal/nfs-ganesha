@@ -1150,7 +1150,7 @@ int populate_posix_file_systems(void)
 	struct glist_head *glist;
 	struct fsal_filesystem *fs;
 
-	PTHREAD_RWLOCK_wrlock(&fs_lock);
+	pthread_rwlock_wrlock(&fs_lock);
 
 	if (!glist_empty(&posix_file_systems))
 		goto out;
@@ -1193,7 +1193,7 @@ int populate_posix_file_systems(void)
 
  out:
 
-	PTHREAD_RWLOCK_unlock(&fs_lock);
+	pthread_rwlock_unlock(&fs_lock);
 	return retval;
 }
 
@@ -1202,7 +1202,7 @@ void release_posix_file_systems(void)
 	struct glist_head *glist, *glistn;
 	struct fsal_filesystem *fs;
 
-	PTHREAD_RWLOCK_wrlock(&fs_lock);
+	pthread_rwlock_wrlock(&fs_lock);
 
 	glist_for_each_safe(glist, glistn, &posix_file_systems) {
 		fs = glist_entry(glist, struct fsal_filesystem, filesystems);
@@ -1219,7 +1219,7 @@ void release_posix_file_systems(void)
 		free_fs(fs);
 	}
 
-	PTHREAD_RWLOCK_unlock(&fs_lock);
+	pthread_rwlock_unlock(&fs_lock);
 }
 
 struct fsal_filesystem *lookup_fsid_locked(struct fsal_fsid__ *fsid,
@@ -1245,11 +1245,11 @@ struct fsal_filesystem *lookup_fsid(struct fsal_fsid__ *fsid,
 {
 	struct fsal_filesystem *fs;
 
-	PTHREAD_RWLOCK_rdlock(&fs_lock);
+	pthread_rwlock_rdlock(&fs_lock);
 
 	fs = lookup_fsid_locked(fsid, fsid_type);
 
-	PTHREAD_RWLOCK_unlock(&fs_lock);
+	pthread_rwlock_unlock(&fs_lock);
 	return fs;
 }
 
@@ -1257,11 +1257,11 @@ struct fsal_filesystem *lookup_dev(struct fsal_dev__ *dev)
 {
 	struct fsal_filesystem *fs;
 
-	PTHREAD_RWLOCK_rdlock(&fs_lock);
+	pthread_rwlock_rdlock(&fs_lock);
 
 	fs = lookup_dev_locked(dev);
 
-	PTHREAD_RWLOCK_unlock(&fs_lock);
+	pthread_rwlock_unlock(&fs_lock);
 
 	return fs;
 }
@@ -1395,7 +1395,7 @@ int claim_posix_filesystems(const char *path,
 	struct stat statbuf;
 	struct fsal_dev__ dev;
 
-	PTHREAD_RWLOCK_wrlock(&fs_lock);
+	pthread_rwlock_wrlock(&fs_lock);
 
 	if (stat(path, &statbuf) != 0) {
 		retval = errno;
@@ -1436,7 +1436,7 @@ int claim_posix_filesystems(const char *path,
 
 out:
 
-	PTHREAD_RWLOCK_unlock(&fs_lock);
+	pthread_rwlock_unlock(&fs_lock);
 	return retval;
 }
 

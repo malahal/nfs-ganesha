@@ -434,7 +434,7 @@ struct file_deleg_stats {
 
 struct cache_entry_t {
 	/** Reader-writer lock for attributes */
-	pthread_rwlock_t attr_lock;
+	mutex_rwlock_t attr_lock;
 	/** The FSAL Handle */
 	struct fsal_obj_handle *obj_handle;
 	/** FH hash linkage */
@@ -468,7 +468,7 @@ struct cache_entry_t {
 	    effect on a cached file handle) and the content lock may
 	    be released and reacquired several times in an operation
 	    that should not see changes in state. */
-	pthread_rwlock_t state_lock;
+	mutex_rwlock_t state_lock;
 	/** States on this cache entry */
 	struct glist_head list_of_states;
 	/** Exports per entry (protected by attr_lock) */
@@ -479,7 +479,7 @@ struct cache_entry_t {
 	struct glist_head layoutrecall_list;
 	/** Lock on type-specific cached content.  See locking
 	    discipline for details. */
-	pthread_rwlock_t content_lock;
+	mutex_rwlock_t content_lock;
 	/** Filetype specific data, discriminated by the type field.
 	    Note that data for special files is in
 	    attributes.rawdev */

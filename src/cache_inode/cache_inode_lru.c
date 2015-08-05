@@ -49,6 +49,7 @@
 #include "nfs_core.h"
 #include "log.h"
 #include "cache_inode.h"
+#include "common_utils.h"
 #include "cache_inode_lru.h"
 #include "abstract_atomic.h"
 #include "cache_inode_hash.h"
@@ -1099,26 +1100,26 @@ cache_inode_lru_pkgshutdown(void)
 
 static inline bool init_rw_locks(cache_entry_t *entry)
 {
-	int rc;
+	int rc = 0;
 	bool attr_lock_init = false;
 	bool content_lock_init = false;
 
 	/* Initialize the entry locks */
-	rc = pthread_rwlock_init(&entry->attr_lock, NULL);
+	PTHREAD_RWLOCK_init(&entry->attr_lock, NULL);
 
 	if (rc != 0)
 		goto fail;
 
 	attr_lock_init = true;
 
-	rc = pthread_rwlock_init(&entry->content_lock, NULL);
+	PTHREAD_RWLOCK_init(&entry->content_lock, NULL);
 
 	if (rc != 0)
 		goto fail;
 
 	content_lock_init = true;
 
-	rc = pthread_rwlock_init(&entry->state_lock, NULL);
+	PTHREAD_RWLOCK_init(&entry->state_lock, NULL);
 
 	if (rc == 0)
 		return true;
@@ -1126,7 +1127,7 @@ static inline bool init_rw_locks(cache_entry_t *entry)
 fail:
 
 	LogCrit(COMPONENT_CACHE_INODE,
-		"pthread_rwlock_init returned %d (%s)",
+		"PTHREAD_RWLOCK_init returned %d (%s)",
 		rc, strerror(rc));
 
 	if (attr_lock_init)

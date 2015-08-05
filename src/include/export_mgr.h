@@ -110,7 +110,7 @@ struct gsh_export {
 	/** References to this export */
 	int64_t refcnt;
 	/** Read/Write lock protecting export */
-	pthread_rwlock_t lock;
+	mutex_rwlock_t lock;
 	/** available mount options */
 	struct export_perms export_perms;
 	/** The last time the export stats were updated */

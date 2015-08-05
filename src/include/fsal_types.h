@@ -203,7 +203,7 @@ typedef struct fsal_ace__ {
 typedef struct fsal_acl__ {
 	uint32_t naces;
 	fsal_ace_t *aces;
-	pthread_rwlock_t lock;
+	mutex_rwlock_t lock;
 	uint32_t ref;
 } fsal_acl_t;
 

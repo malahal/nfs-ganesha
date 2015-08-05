@@ -41,7 +41,7 @@
 #define SERVER_BY_ID_CACHE_SIZE 193
 
 struct server_by_id {
-	pthread_rwlock_t lock;
+	mutex_rwlock_t lock;
 	struct avltree t;
 	struct avltree_node *cache[SERVER_BY_ID_CACHE_SIZE];
 };

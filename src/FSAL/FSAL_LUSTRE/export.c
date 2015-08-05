@@ -649,7 +649,7 @@ void lustre_unexport_filesystems(struct lustre_fsal_export *exp)
 	struct glist_head *glist, *glistn;
 	struct lustre_filesystem_export_map *map;
 
-	PTHREAD_RWLOCK_wrlock(&fs_lock);
+	pthread_rwlock_wrlock(&fs_lock);
 
 	glist_for_each_safe(glist, glistn, &exp->filesystems) {
 		map = glist_entry(glist,
@@ -671,7 +671,7 @@ void lustre_unexport_filesystems(struct lustre_fsal_export *exp)
 		gsh_free(map);
 	}
 
-	PTHREAD_RWLOCK_unlock(&fs_lock);
+	pthread_rwlock_unlock(&fs_lock);
 }
 
 /*********************************************/

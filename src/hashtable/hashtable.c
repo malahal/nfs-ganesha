@@ -334,11 +334,7 @@ hashtable_init(struct hash_param *hparam)
 		partition = (&ht->partitions[index]);
 		RBT_HEAD_INIT(&(partition->rbt));
 
-		if (pthread_rwlock_init(&partition->lock, &rwlockattr) != 0) {
-			LogCrit(COMPONENT_HASHTABLE,
-				"Unable to initialize lock in hash table.");
-			goto deconstruct;
-		}
+		PTHREAD_RWLOCK_init(&partition->lock, &rwlockattr);
 
 		/* Allocate a cache if requested */
 		if (hparam->flags & HT_FLAG_CACHE) {

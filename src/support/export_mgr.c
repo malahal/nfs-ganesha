@@ -73,7 +73,7 @@
 #define EXPORT_BY_ID_CACHE_SIZE 769
 
 struct export_by_id {
-	pthread_rwlock_t lock;
+	mutex_rwlock_t lock;
 	struct avltree t;
 	struct avltree_node *cache[EXPORT_BY_ID_CACHE_SIZE];
 };

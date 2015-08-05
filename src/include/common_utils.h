@@ -87,9 +87,11 @@ typedef struct {
 	pthread_rwlock_t lock;
 #ifdef DEBUG_STATS
 	struct timespec start;
-	struct timespec total;
-	uint64_t diff;
-	long count;
+	struct timespec wait;
+	struct timespec hold;
+	long rcount;
+	long wcount;
+	int type;
 #endif
 } mutex_rwlock_t;
 
@@ -108,9 +110,13 @@ typedef struct {
 		zlock = _lock.lock;					\
 		xlock = _lock;						\
 									\
-		xlock->count = 0;					\
-		xlock->total.tv_sec = 0;				\
-		xlock->total.tv_nsec = 0;				\
+		xlock->type = 0;					\
+		xlock->rcount = 0;					\
+		xlock->wcount = 0;					\
+		xlock->hold.tv_sec = 0;					\
+		xlock->hold.tv_nsec = 0;				\
+		xlock->wait.tv_sec = 0;					\
+		xlock->wait.tv_sec = 0;					\
 		rc = pthread_rwlock_init(zlock, _attr);			\
 		if (rc == 0) {						\
 			LogFullDebug(COMPONENT_RW_LOCK,			\
@@ -161,14 +167,22 @@ typedef struct {
 #define PTHREAD_RWLOCK_wrlock(_lock)					\
 	do {								\
 		int rc;							\
+		uint64_t tdiff;						\
+		struct timespec twait;					\
+		struct timespec tstop;					\
 		pthread_rwlock_t *zlock;				\
 		mutex_rwlock_t   *xlock;				\
 		zlock = _lock.lock;					\
 		xlock = _lock;						\
 									\
+		now(&twait);						\
 		rc = pthread_rwlock_wrlock(zlock);			\
 		if (rc == 0) {						\
-			xlock->count += 1;				\
+                	now(&tstop);                                    \
+                	tdiff = timespec_diff(&twait, &tstop);		\
+                	timespec_add_nsecs(tdiff, &xlock->wait);        \
+			xlock->wcount += 1;				\
+			xlock->type = 1;				\
 			now(&(xlock->start));				\
 			LogFullDebug(COMPONENT_RW_LOCK,			\
 				     "Got write lock on %p (%s) "	\
@@ -199,8 +213,8 @@ typedef struct {
 									\
 		rc = pthread_rwlock_rdlock(zlock);			\
 		if (rc == 0) {						\
-                        xlock->count += 1;                              \
-                        now(&(xlock->start));                           \
+                        xlock->rcount += 1;                             \
+                        xlock->type = 0;	                        \
 			LogFullDebug(COMPONENT_RW_LOCK,			\
 				     "Got read lock on %p (%s) "	\
 				     "at %s:%d", _lock, #_lock,		\
@@ -223,22 +237,25 @@ typedef struct {
 #define PTHREAD_RWLOCK_unlock(_lock)					\
 	do {								\
 		int rc;							\
+		uint64_t tdiff;						\
 		struct timespec stop;					\
 		pthread_rwlock_t *zlock;				\
 		zlock = _lock.lock;					\
 		mutex_rwlock_t   *xlock;				\
 		xlock = _lock;						\
-									\
-		now(&stop);						\
-		xlock->diff += timespec_diff(&(xlock->start), &stop);	\
-		timespec_add_nsecs(xlock->diff, &xlock->total);		\
+		if (xlock->type == 1) {					\
+			now(&stop);					\
+			tdiff = timespec_diff(&(xlock->start), &stop);	\
+			timespec_add_nsecs(tdiff, &xlock->hold);	\
+		}							\
 		rc = pthread_rwlock_unlock(zlock);			\
 		if (rc == 0) {						\
 			LogDebug(COMPONENT_RW_LOCK,			\
-			     "Unlocked %p (%s) at %s:%d cnt %ld diff %lu total %lu:%lu",\
+			     "Unlocked %p (%s) at %s:%d #w %ld #r %ld wait %lu:%lu hold %lu:%lu",\
 			     _lock, #_lock, __FILE__, __LINE__,		\
-			     xlock->count, xlock->diff,			\
-			     xlock->total.tv_sec, xlock->total.tv_nsec);\
+			     xlock->wcount, xlock->rcount,		\
+			     xlock->wait.tv_sec, xlock->wait.tv_nsec,	\
+			     xlock->hold.tv_sec, xlock->hold.tv_nsec);	\
 			LogFullDebug(COMPONENT_RW_LOCK,			\
 				     "Unlocked %p (%s) at %s:%d",       \
 				     _lock, #_lock,			\
@@ -290,7 +307,7 @@ typedef struct {
 		rc = pthread_mutex_unlock(_mtx);			\
 		if (rc == 0) {						\
 			LogFullDebug(COMPONENT_RW_LOCK,			\
-				     "Released mutex %p (%s) at %s:%d",	\
+			  	   "Released mutex %p (%s) at %s:%d",	\
 				     _mtx, #_mtx,			\
 				     __FILE__, __LINE__);		\
 		} else{							\

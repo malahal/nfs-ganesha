@@ -259,6 +259,11 @@ MODULE_FINI void gpfs_unload(void)
 {
 	int retval;
 
+	/* Release our log facility */
+	/* TODO: store the prior default log facility and restore it */
+	retval = set_default_log_facility("FILE");
+	if (retval == -ENOENT)
+		(void)set_default_log_facility("SYSLOG");
 	release_log_facility("GPFS");
 
 	retval = unregister_fsal(&GPFS.fsal);

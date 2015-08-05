@@ -1182,18 +1182,18 @@ void nfs_rpc_queue_init(void)
 			 "Unable to initialize decoder thread pool: %d", rc);
 
 	/* queues */
-	pthread_mutex_init(&nfs_req_st.reqs.sp, NULL);
 	nfs_req_st.reqs.size = 0;
 	for (ix = 0; ix < N_REQ_QUEUES; ++ix) {
+		pthread_mutex_init(&nfs_req_st.reqs.sp[ix], NULL);
+		/* waitq */
+		glist_init(&nfs_req_st.reqs.wait_list[ix]);
+		nfs_req_st.reqs.waiters[ix] = 0;
+
 		qpair = &(nfs_req_st.reqs.nfs_request_q.qset[ix]);
 		qpair->s = "mixed";
 		nfs_rpc_q_init(&qpair->producer);
 		nfs_rpc_q_init(&qpair->consumer);
 	}
-
-	/* waitq */
-	glist_init(&nfs_req_st.reqs.wait_list);
-	nfs_req_st.reqs.waiters = 0;
 
 	/* stallq */
 	gsh_mutex_init(&nfs_req_st.stallq.mtx, NULL);
@@ -1240,7 +1240,8 @@ void nfs_rpc_enqueue_req(request_data_t *reqdata)
 	case _9P_REQUEST:
 		/* XXX identify high-latency requests and allocate
 		 * to the high-latency queue, as above */
-		qpair = &(nfs_request_q->qset[0]);
+		slot = 0;
+		qpair = &(nfs_request_q->qset[slot]);
 		break;
 #endif
 	default:
@@ -1272,21 +1273,22 @@ void nfs_rpc_enqueue_req(request_data_t *reqdata)
 		wait_q_entry_t *wqe;
 
 		/* SPIN LOCKED */
-		pthread_mutex_lock(&nfs_req_st.reqs.sp);
-		if (nfs_req_st.reqs.waiters) {
-			wqe = glist_first_entry(&nfs_req_st.reqs.wait_list,
-						wait_q_entry_t, waitq);
+		pthread_mutex_lock(&nfs_req_st.reqs.sp[slot]);
+		if (nfs_req_st.reqs.waiters[slot]) {
+			wqe =
+			    glist_first_entry(&nfs_req_st.reqs.wait_list[slot],
+					      wait_q_entry_t, waitq);
 
 			LogFullDebug(COMPONENT_DISPATCH,
 				     "nfs_req_st.reqs.waiters %u signal wqe %p (for q %p)",
-				     nfs_req_st.reqs.waiters, wqe, q);
+				     nfs_req_st.reqs.waiters[slot], wqe, q);
 
 			/* release 1 waiter */
 			glist_del(&wqe->waitq);
-			--(nfs_req_st.reqs.waiters);
+			--(nfs_req_st.reqs.waiters[slot]);
 			--(wqe->waiters);
 			/* ! SPIN LOCKED */
-			pthread_mutex_unlock(&nfs_req_st.reqs.sp);
+			pthread_mutex_unlock(&nfs_req_st.reqs.sp[slot]);
 			PTHREAD_MUTEX_lock(&wqe->lwe.mtx);
 			/* XXX reliable handoff */
 			wqe->flags |= Wqe_LFlag_SyncDone;
@@ -1295,7 +1297,7 @@ void nfs_rpc_enqueue_req(request_data_t *reqdata)
 			PTHREAD_MUTEX_unlock(&wqe->lwe.mtx);
 		} else
 			/* ! SPIN LOCKED */
-			pthread_mutex_unlock(&nfs_req_st.reqs.sp);
+			pthread_mutex_unlock(&nfs_req_st.reqs.sp[slot]);
 	}
 
  out:
@@ -1365,35 +1367,25 @@ request_data_t *nfs_rpc_dequeue_req(nfs_worker_data_t *worker)
 	request_data_t *reqdata = NULL;
 	struct req_q_set *nfs_request_q = &nfs_req_st.reqs.nfs_request_q;
 	struct req_q_pair *qpair;
-	uint32_t ix, slot;
+	uint32_t slot;
 	struct timespec timeout;
 
 	/* XXX: the following stands in for a more robust/flexible
 	 * weighting function */
 
- retry_deq:
-	slot = (nfs_rpc_q_next_slot() % N_REQ_QUEUES);
-	for (ix = 0; ix < N_REQ_QUEUES; ++ix) {
-		qpair = &(nfs_request_q->qset[slot]);
+	slot = worker->worker_index % N_REQ_QUEUES;
+	qpair = &(nfs_request_q->qset[slot]);
 
-		LogFullDebug(COMPONENT_DISPATCH,
-			     "dequeue_req try qpair %s %p:%p", qpair->s,
-			     &qpair->producer, &qpair->consumer);
+	LogFullDebug(COMPONENT_DISPATCH,
+		     "dequeue_req try qpair %s %p:%p", qpair->s,
+		     &qpair->producer, &qpair->consumer);
 
-		/* anything? */
-		reqdata = nfs_rpc_consume_req(qpair);
-		if (reqdata) {
-			atomic_inc_uint32_t(&dequeued_reqs);
-			break;
-		}
-
-		++slot;
-		slot = slot % N_REQ_QUEUES;
-
-	}			/* for */
-
-	/* wait */
-	if (!reqdata) {
+retry_deq:
+	/* anything? */
+	reqdata = nfs_rpc_consume_req(qpair);
+	if (reqdata) {
+		atomic_inc_uint32_t(&dequeued_reqs);
+	} else { /* wait */
 		struct fridgethr_context *ctx =
 			container_of(worker, struct fridgethr_context, wd);
 		wait_q_entry_t *wqe = &worker->wqe;
@@ -1403,10 +1395,10 @@ request_data_t *nfs_rpc_dequeue_req(nfs_worker_data_t *worker)
 		wqe->flags = Wqe_LFlag_WaitSync;
 		wqe->waiters = 1;
 		/* XXX functionalize */
-		pthread_mutex_lock(&nfs_req_st.reqs.sp);
-		glist_add_tail(&nfs_req_st.reqs.wait_list, &wqe->waitq);
-		++(nfs_req_st.reqs.waiters);
-		pthread_mutex_unlock(&nfs_req_st.reqs.sp);
+		pthread_mutex_lock(&nfs_req_st.reqs.sp[slot]);
+		glist_add_tail(&nfs_req_st.reqs.wait_list[slot], &wqe->waitq);
+		++(nfs_req_st.reqs.waiters[slot]);
+		pthread_mutex_unlock(&nfs_req_st.reqs.sp[slot]);
 		while (!(wqe->flags & Wqe_LFlag_SyncDone)) {
 			timeout.tv_sec = time(NULL) + 5;
 			timeout.tv_nsec = 0;
@@ -1415,19 +1407,19 @@ request_data_t *nfs_rpc_dequeue_req(nfs_worker_data_t *worker)
 			if (fridgethr_you_should_break(ctx)) {
 				/* We are returning;
 				 * so take us out of the waitq */
-				pthread_mutex_lock(&nfs_req_st.reqs.sp);
+				pthread_mutex_lock(&nfs_req_st.reqs.sp[slot]);
 				if (wqe->waitq.next != NULL
 				    || wqe->waitq.prev != NULL) {
 					/* Element is still in wqitq,
 					 * remove it */
 					glist_del(&wqe->waitq);
-					--(nfs_req_st.reqs.waiters);
+					--(nfs_req_st.reqs.waiters[slot]);
 					--(wqe->waiters);
 					wqe->flags &=
 					    ~(Wqe_LFlag_WaitSync |
 					      Wqe_LFlag_SyncDone);
 				}
-				pthread_mutex_unlock(&nfs_req_st.reqs.sp);
+				pthread_mutex_unlock(&nfs_req_st.reqs.sp[slot]);
 				PTHREAD_MUTEX_unlock(&wqe->lwe.mtx);
 				return NULL;
 			}

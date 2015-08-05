@@ -48,6 +48,7 @@ struct req_q {
 	pthread_mutex_t sp;
 	struct glist_head q;	/* LIFO */
 	uint32_t size;
+	uint64_t total;   /* cumulative */
 	uint32_t max;
 	uint32_t waiters;
 };

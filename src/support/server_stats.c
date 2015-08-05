@@ -1058,6 +1058,30 @@ static void record_nfsv3_stats(struct svc_req *req,
 	}
 }
 
+#include "nfs_req_queue.h"
+void dump_rpc_queue_stats(FILE *fp)
+{
+	int i;
+	struct req_q_pair *qpair;
+	struct req_q *q;
+
+	extern uint32_t nfs_rpc_outstanding_reqs_est(void);
+	extern struct nfs_req_st nfs_req_st;
+
+	fprintf(fp,
+		"RPC queue stats: num_qs:%d, total reqs:%u, active reqs:%u\n",
+		N_REQ_QUEUES,
+		get_enqueue_count(),
+		nfs_rpc_outstanding_reqs_est());
+	for (i = 0; i < N_REQ_QUEUES; i++) {
+		qpair = &nfs_req_st.reqs.nfs_request_q.qset[i];
+		q = &qpair->producer;
+		fprintf(fp, "\t\tQ%d: total:%lu, active:%u\n",
+			i, q->total, q->size);
+	}
+
+}
+
 void dump_nfsv3_stats()
 {
 	FILE *fp;
@@ -1091,6 +1115,7 @@ void dump_nfsv3_stats()
 				nfsv3_stats[op].queue_latency.min,
 				nfsv3_stats[op].queue_latency.max);
 	}
+	dump_rpc_queue_stats(fp);
 	fclose(fp);
 }
 

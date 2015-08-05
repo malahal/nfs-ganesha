@@ -1255,6 +1255,7 @@ void nfs_rpc_enqueue_req(request_data_t *reqdata)
 	pthread_mutex_lock(&q->sp);
 	glist_add_tail(&q->q, &reqdata->req_q);
 	++(q->size);
+	++(q->total);
 	pthread_mutex_unlock(&q->sp);
 
 	atomic_inc_uint32_t(&enqueued_reqs);

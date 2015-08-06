@@ -1076,10 +1076,9 @@ void dump_rpc_queue_stats(FILE *fp)
 	for (i = 0; i < N_REQ_QUEUES; i++) {
 		qpair = &nfs_req_st.reqs.nfs_request_q.qset[i];
 		q = &qpair->producer;
-		fprintf(fp, "\t\tQ%d: total:%lu, active:%u\n",
-			i, q->total, q->size);
+		fprintf(fp, "\t\tQ%d: total:%lu, active:%u\n", i, q->total,
+			qpair->producer.size + qpair->consumer.size);
 	}
-
 }
 
 void dump_nfsv3_stats()

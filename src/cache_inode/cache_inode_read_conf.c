@@ -53,7 +53,7 @@
 struct cache_inode_parameter cache_param;
 
 static struct config_item cache_inode_params[] = {
-	CONF_ITEM_UI32("NParts", 1, 32633, 7,
+	CONF_ITEM_UI32("NParts", 1, 32633, 131,
 		       cache_inode_parameter, nparts),
 	CONF_ITEM_UI32("Cache_Size", 1, UINT32_MAX, 32633,
 		       cache_inode_parameter, cache_size),

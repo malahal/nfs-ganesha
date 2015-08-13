@@ -194,9 +194,11 @@ void dump_gpfs_fsal_stats()
 	for (op = 100; op < ARRAY_SIZE(gpfs_stats); op++) {
 		if (gpfs_stats[op].num_ops)
 			fprintf(fp,
-				"op:%u, num:%lu, resp:%lu, resp_min:%lu, resp_max:%lu\n",
+				"op:%u, num:%lu, resp:%lu, resp_avems:%f, resp_min:%lu, resp_max:%lu\n",
 				op, gpfs_stats[op].num_ops,
 				gpfs_stats[op].resp_time,
+				(float)gpfs_stats[op].resp_time /
+					NS_PER_MSEC / gpfs_stats[op].num_ops,
 				gpfs_stats[op].resp_time_min,
 				gpfs_stats[op].resp_time_max);
 	}

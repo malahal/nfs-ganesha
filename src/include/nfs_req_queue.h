@@ -37,12 +37,7 @@
 
 #include "gsh_list.h"
 #include "wait_queue.h"
-
-/* XXX moving to gsh_intrinsic.h */
-#ifndef CACHE_LINE_SIZE
-#define CACHE_LINE_SIZE 64	/* XXX arch-specific define */
-#endif
-#define CACHE_PAD(_n) char __pad ## _n [CACHE_LINE_SIZE]
+#include "gsh_intrinsic.h"
 
 struct req_q {
 	pthread_mutex_t sp;

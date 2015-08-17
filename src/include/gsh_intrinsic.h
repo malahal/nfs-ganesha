@@ -49,8 +49,13 @@
 #endif
 
 #ifndef CACHE_LINE_SIZE
+#if defined(__PPC64__)
+#define CACHE_LINE_SIZE 128
+#else /* __x86_64__, __i386__ and others */
 #define CACHE_LINE_SIZE 64
 #endif
+#endif
+
 #define CACHE_PAD(_n) char __pad ## _n [CACHE_LINE_SIZE]
 
 #endif				/* _GSH_INTRINSIC_H */

@@ -64,17 +64,21 @@ extern const char *req_q_s[N_REQ_QUEUES];	/* for debug prints */
 struct req_q_set {
 	struct req_q_pair qset[N_REQ_QUEUES];
 };
+struct qwait {
+	pthread_spinlock_t wait_lock;
+	struct glist_head wait_list;
+	uint32_t waiters;
+	CACHE_PAD(0);
+};
 
 struct nfs_req_st {
 	struct {
 		uint32_t ctr;
 		struct req_q_set nfs_request_q;
 		uint64_t size;
-		pthread_spinlock_t sp[N_REQ_QUEUES];
-		struct glist_head wait_list[N_REQ_QUEUES];
-		uint32_t waiters[N_REQ_QUEUES];
+		struct qwait qwait[N_REQ_QUEUES];
 	} reqs;
-	 CACHE_PAD(1);
+	CACHE_PAD(1);
 	struct {
 		pthread_mutex_t mtx;
 		struct glist_head q;
@@ -112,15 +116,15 @@ static inline void nfs_rpc_queue_awaken(void *arg)
 	int slot;
 
 	for (slot = 0; slot < N_REQ_QUEUES; slot++) {
-		pthread_spin_lock(&st->reqs.sp[slot]);
-		glist_for_each_safe(g, n, &st->reqs.wait_list[slot]) {
+		pthread_spin_lock(&st->reqs.qwait[slot].wait_lock);
+		glist_for_each_safe(g, n, &st->reqs.qwait[slot].wait_list) {
 			wait_q_entry_t *wqe =
 				glist_entry(g, wait_q_entry_t, waitq);
 
 			pthread_cond_signal(&wqe->lwe.cv);
 			pthread_cond_signal(&wqe->rwe.cv);
 		}
-		pthread_spin_unlock(&st->reqs.sp[slot]);
+		pthread_spin_unlock(&st->reqs.qwait[slot].wait_lock);
 	}
 }
 

@@ -40,7 +40,7 @@
 #include "gsh_intrinsic.h"
 
 struct req_q {
-	pthread_mutex_t sp;
+	pthread_spinlock_t sp;
 	struct glist_head q;	/* LIFO */
 	uint32_t size;
 	uint64_t total;   /* cumulative */
@@ -70,7 +70,7 @@ struct nfs_req_st {
 		uint32_t ctr;
 		struct req_q_set nfs_request_q;
 		uint64_t size;
-		pthread_mutex_t sp[N_REQ_QUEUES];
+		pthread_spinlock_t sp[N_REQ_QUEUES];
 		struct glist_head wait_list[N_REQ_QUEUES];
 		uint32_t waiters[N_REQ_QUEUES];
 	} reqs;
@@ -90,7 +90,7 @@ void nfs_rpc_queue_init(void);
 static inline void nfs_rpc_q_init(struct req_q *q)
 {
 	glist_init(&q->q);
-	pthread_mutex_init(&q->sp, NULL);
+	pthread_spin_init(&q->sp, PTHREAD_PROCESS_PRIVATE);
 	q->size = 0;
 	q->waiters = 0;
 }
@@ -112,7 +112,7 @@ static inline void nfs_rpc_queue_awaken(void *arg)
 	int slot;
 
 	for (slot = 0; slot < N_REQ_QUEUES; slot++) {
-		pthread_mutex_lock(&st->reqs.sp[slot]);
+		pthread_spin_lock(&st->reqs.sp[slot]);
 		glist_for_each_safe(g, n, &st->reqs.wait_list[slot]) {
 			wait_q_entry_t *wqe =
 				glist_entry(g, wait_q_entry_t, waitq);
@@ -120,7 +120,7 @@ static inline void nfs_rpc_queue_awaken(void *arg)
 			pthread_cond_signal(&wqe->lwe.cv);
 			pthread_cond_signal(&wqe->rwe.cv);
 		}
-		pthread_mutex_unlock(&st->reqs.sp[slot]);
+		pthread_spin_unlock(&st->reqs.sp[slot]);
 	}
 }
 

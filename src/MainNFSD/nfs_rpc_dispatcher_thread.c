@@ -1223,6 +1223,9 @@ void nfs_rpc_enqueue_req(request_data_t *reqdata)
 	struct req_q *q;
 	static uint32_t mslot;
 	uint32_t slot;
+	uint32_t average_qsize;
+	uint32_t qsize;
+	int i;
 
 	nfs_request_q = &nfs_req_st.reqs.nfs_request_q;
 
@@ -1235,18 +1238,28 @@ void nfs_rpc_enqueue_req(request_data_t *reqdata)
 			     reqdata->r_u.req.lookahead.flags);
 
 		slot = atomic_inc_uint32_t(&mslot) % N_REQ_QUEUES;
-		qpair = &(nfs_request_q->qset[slot]);
 		break;
 #ifdef _USE_9P
 	case _9P_REQUEST:
 		/* XXX identify high-latency requests and allocate
 		 * to the high-latency queue, as above */
 		slot = 0;
-		qpair = &(nfs_request_q->qset[slot]);
 		break;
 #endif
 	default:
 		goto out;
+	}
+
+	/* Skip some queues that are way more than average size.
+	 * Just a heuristic, so no locks are acquired
+	 */
+	average_qsize = (enqueued_reqs - dequeued_reqs) / N_REQ_QUEUES;
+	for (i = 0; i < MIN(4, N_REQ_QUEUES); i++) {
+		qpair = &(nfs_request_q->qset[slot]);
+		qsize = qpair->producer.size + qpair->consumer.size;
+		if (qsize <= 3 * average_qsize)
+			break;
+		slot = (slot + 1) % N_REQ_QUEUES;
 	}
 
 	/* this one is real, timestamp it

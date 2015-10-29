@@ -5,7 +5,6 @@
 #include "config.h"
 #include "gsh_rpc.h"
 #include "nfs23.h"
-#include "nfs_fh.h"
 
 static struct nfs_request_lookahead dummy_lookahead = {
 	.flags = 0,
@@ -443,7 +442,6 @@ bool xdr_nfs_fh3(xdrs, objp)
 register XDR *xdrs;
 nfs_fh3 *objp;
 {
-	file_handle_v3_t *fh;
 
 #if defined(_LP64) || defined(_KERNEL)
 	register int __attribute__ ((__unused__)) * buf;
@@ -451,19 +449,10 @@ nfs_fh3 *objp;
 	register long __attribute__ ((__unused__)) * buf;
 #endif
 
-	if (xdrs->x_op == XDR_ENCODE) {
-		fh = (file_handle_v3_t *)objp->data.data_val;
-		fh->exportid = htons(fh->exportid);
-	}
 	if (!xdr_bytes
 	    (xdrs, (char **)&objp->data.data_val,
 	     (u_int *) & objp->data.data_len, 64))
 		return (false);
-
-	if (xdrs->x_op == XDR_DECODE) {
-		fh = (file_handle_v3_t *)objp->data.data_val;
-		fh->exportid = ntohs(fh->exportid);
-	}
 	return (true);
 }
 

@@ -257,8 +257,7 @@ dsh_ops_init(struct fsal_dsh_ops *ops)
 
 static nfsstat4 make_ds_handle(struct fsal_pnfs_ds *const pds,
 			       const struct gsh_buffdesc *const desc,
-			       struct fsal_ds_handle **const handle,
-			       int flags)
+			       struct fsal_ds_handle **const handle)
 {
 	struct lustre_file_handle *lustre_fh =
 					(struct lustre_file_handle *)desc->addr;

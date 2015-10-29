@@ -396,8 +396,7 @@ static void dsh_ops_init(struct fsal_dsh_ops *ops)
 
 static nfsstat4 make_ds_handle(struct fsal_pnfs_ds *const pds,
 			       const struct gsh_buffdesc *const desc,
-			       struct fsal_ds_handle **const handle,
-			       int flags)
+			       struct fsal_ds_handle **const handle)
 {
 	struct ds_wire *dsw = (struct ds_wire *)desc->addr;
 	struct ds *ds;			/* Handle to be created */

@@ -154,8 +154,7 @@ cache_entry_t *nfs3_FhandleToCache(nfs_fh3 *fh3,
 	/* adjust the handle opaque into a cache key */
 	fsal_status =
 	    export->exp_ops.extract_handle(export, FSAL_DIGEST_NFSV3,
-					   &fsal_data.fh_desc,
-					   v3_handle->fhflags1);
+					&fsal_data.fh_desc);
 
 	if (FSAL_IS_ERROR(fsal_status))
 		cache_status = cache_inode_error_convert(fsal_status);
@@ -206,9 +205,6 @@ bool nfs4_FSALToFhandle(nfs_fh4 *fh4,
 	}
 
 	file_handle->fhversion = GANESHA_FH_VERSION;
-#if (BYTE_ORDER == BIG_ENDIAN)
-	file_handle->fhflags1 = FH_FSAL_BIG_ENDIAN;
-#endif
 	file_handle->fs_len = fh_desc.len;	/* set the actual size */
 	/* keep track of the export id */
 	file_handle->id.exports = exp->export_id;
@@ -216,8 +212,6 @@ bool nfs4_FSALToFhandle(nfs_fh4 *fh4,
 	/* Set the len */
 	fh4->nfs_fh4_len = nfs4_sizeof_handle(file_handle);
 
-	LogFullDebug(COMPONENT_FILEHANDLE, "NFS4 Handle 0x%X export id %d",
-		file_handle->fhflags1, file_handle->id.exports);
 	LogFullDebugOpaque(COMPONENT_FILEHANDLE, "NFS4 Handle %s", LEN_FH_STR,
 			   fh4->nfs_fh4_val, fh4->nfs_fh4_len);
 
@@ -262,9 +256,6 @@ bool nfs3_FSALToFhandle(nfs_fh3 *fh3,
 	}
 
 	file_handle->fhversion = GANESHA_FH_VERSION;
-#if (BYTE_ORDER == BIG_ENDIAN)
-	file_handle->fhflags1 = FH_FSAL_BIG_ENDIAN;
-#endif
 	file_handle->fs_len = fh_desc.len;	/* set the actual size */
 	/* keep track of the export id */
 	file_handle->exportid = exp->export_id;
@@ -332,9 +323,6 @@ int nfs4_Is_Fh_Invalid(nfs_fh4 *fh)
 
 	/* Cast the fh as a non opaque structure */
 	pfile_handle = (file_handle_v4_t *) (fh->nfs_fh4_val);
-
-	LogFullDebug(COMPONENT_FILEHANDLE, "NFS4 Handle 0x%X export id %d",
-		pfile_handle->fhflags1, pfile_handle->id.exports);
 
 	/* validate the filehandle  */
 	if (pfile_handle == NULL || fh->nfs_fh4_len == 0

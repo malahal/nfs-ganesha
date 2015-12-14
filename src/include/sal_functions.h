@@ -767,6 +767,8 @@ state_status_t state_async_init();
 void state_async_thread_start();
 
 void grant_blocked_lock_upcall(cache_entry_t        * pentry,
+                               int                    lfd,
+                               int                    mount_root_fd,
                                void                 * powner,
                                fsal_lock_param_t    * plock);
 

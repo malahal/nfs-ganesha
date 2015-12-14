@@ -3060,7 +3060,7 @@ state_status_t state_owner_unlock_all(fsal_op_context_t    * pcontext,
 
 #ifdef _USE_BLOCKING_LOCKS
 
-void find_blocked_lock_upcall(cache_entry_t        * pentry,
+bool_t find_blocked_lock_upcall(cache_entry_t        * pentry,
                               void                 * powner,
                               fsal_lock_param_t    * plock,
                               state_grant_type_t     grant_type)
@@ -3068,6 +3068,14 @@ void find_blocked_lock_upcall(cache_entry_t        * pentry,
   state_lock_entry_t   * found_entry;
   struct glist_head    * glist;
   state_block_data_t   * pblock;
+
+  /* DEBUG, REMOVE THIS !!! */
+  {
+  LogInfo(COMPONENT_STATE,
+              "find_blocked_lock_upcall, about to sleep 20\n");
+  sleep(20);
+  }
+  /* DEBUG, REMOVE ABOVE BLOCK !!! */
 
   P(blocked_locks_mutex);
 
@@ -3100,7 +3108,7 @@ void find_blocked_lock_upcall(cache_entry_t        * pentry,
 
       signal_async_work();
 
-      return;
+      return TRUE;
     } /* glist_for_each_safe */
 
   if(isFullDebug(COMPONENT_STATE) &&
@@ -3122,7 +3130,8 @@ void find_blocked_lock_upcall(cache_entry_t        * pentry,
   /* We must be out of sync with FSAL, this is fatal */
   LogLockDesc(COMPONENT_STATE, NIV_MAJOR,
               "Blocked Lock Not Found for", pentry, powner, plock);
-  LogFatal(COMPONENT_STATE, "Locks out of sync with FSAL");
+  LogEvent(COMPONENT_STATE, "Locks out of sync with FSAL");
+  return FALSE;
 }
 
 /**
@@ -3131,13 +3140,53 @@ void find_blocked_lock_upcall(cache_entry_t        * pentry,
  *
  */
 void grant_blocked_lock_upcall(cache_entry_t        * pentry,
+			       int                    lfd,
+			       int                    mount_root_fd,
                                void                 * powner,
                                fsal_lock_param_t    * plock)
 {
   LogLockDesc(COMPONENT_STATE, NIV_DEBUG,
               "Grant Upcall for", pentry, powner, plock);
 
-  find_blocked_lock_upcall(pentry, powner, plock, STATE_GRANT_FSAL);
+  if(!find_blocked_lock_upcall(pentry, powner, plock, STATE_GRANT_FSAL))
+  {
+    cache_inode_status_t   cache_status;
+    cache_status = cache_inode_inc_pin_ref(pentry);
+    int retval;
+
+    if(cache_status != CACHE_INODE_SUCCESS)
+    { 
+      LogDebug(COMPONENT_STATE,
+               "Could not pin file");
+      return ;
+    }
+    struct glock glock_args;
+    struct set_get_lock_arg gpfs_sg_arg;
+
+    glock_args.cmd = F_SETLK;
+    glock_args.flock.l_type = F_UNLCK;
+    glock_args.flock.l_len = plock->lock_length;
+    glock_args.flock.l_start = plock->lock_start;
+    glock_args.flock.l_whence = SEEK_SET;
+
+//    glock_args.lfd = lfd;
+    if (cache_inode_fd(pentry) == NULL)
+    {
+      LogDebug(COMPONENT_STATE,
+               "Could not get fd");
+      cache_inode_dec_pin_ref(pentry, FALSE);
+      return ;
+    }
+    glock_args.lfd = ((gpfsfsal_file_t *)cache_inode_fd(pentry))->fd;
+    glock_args.lock_owner = powner;
+    gpfs_sg_arg.mountdirfd = mount_root_fd;
+    gpfs_sg_arg.lock = &glock_args;
+
+    retval = gpfs_ganesha(OPENHANDLE_SET_LOCK, &gpfs_sg_arg);
+    LogEvent(COMPONENT_STATE, "unlock %d:%d retval=%d errno=%d\n", glock_args.lfd, gpfs_sg_arg.mountdirfd, retval, errno);
+
+    cache_inode_dec_pin_ref(pentry, FALSE);
+  }
 }
 
 /**

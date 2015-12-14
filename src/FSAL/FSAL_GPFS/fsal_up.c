@@ -234,14 +234,16 @@ void *GPFSFSAL_UP_Thread(void *Arg)
       switch(reason)
         {
           case INODE_LOCK_GRANTED: /* Lock Event */
-            LogMidDebug(COMPONENT_FSAL_UP,
-                        "inode lock granted: owner %p pid %d type %d start %lld len %lld",
+            LogEvent(COMPONENT_FSAL_UP,
+                        "inode lock granted: owner %p pid %d type %d start %lld len %lld fd=%x callback.mountdirfd=%d",
                         fl.lock_owner, fl.flock.l_pid, fl.flock.l_type,
-                        (long long) fl.flock.l_start, (long long) fl.flock.l_len);
+                        (long long) fl.flock.l_start, (long long) fl.flock.l_len, (int)fl.lfd, (int)callback.mountdirfd);
             pevent->event_data.type.lock_grant.lock_owner = fl.lock_owner;
             pevent->event_data.type.lock_grant.lock_param.lock_length = fl.flock.l_len;
             pevent->event_data.type.lock_grant.lock_param.lock_start = fl.flock.l_start;
             pevent->event_data.type.lock_grant.lock_param.lock_type = fl.flock.l_type;
+            pevent->event_data.type.lock_grant.lfd = fl.lfd;
+            pevent->event_data.type.lock_grant.mount_root_fd = callback.mountdirfd;
             pevent->event_type = FSAL_UP_EVENT_LOCK_GRANT;
             break;
 

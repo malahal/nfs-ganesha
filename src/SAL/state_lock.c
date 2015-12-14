@@ -3061,9 +3061,9 @@ state_status_t state_owner_unlock_all(fsal_op_context_t    * pcontext,
 #ifdef _USE_BLOCKING_LOCKS
 
 bool_t find_blocked_lock_upcall(cache_entry_t        * pentry,
-                              void                 * powner,
-                              fsal_lock_param_t    * plock,
-                              state_grant_type_t     grant_type)
+                                void                 * powner,
+                                fsal_lock_param_t    * plock,
+                                state_grant_type_t     grant_type)
 {
   state_lock_entry_t   * found_entry;
   struct glist_head    * glist;
@@ -3072,7 +3072,7 @@ bool_t find_blocked_lock_upcall(cache_entry_t        * pentry,
   /* DEBUG, REMOVE THIS !!! */
   {
   LogInfo(COMPONENT_STATE,
-              "find_blocked_lock_upcall, about to sleep 20\n");
+              "find_blocked_lock_upcall, about to sleep 20 sec\n");
   sleep(20);
   }
   /* DEBUG, REMOVE ABOVE BLOCK !!! */
@@ -3140,53 +3140,59 @@ bool_t find_blocked_lock_upcall(cache_entry_t        * pentry,
  *
  */
 void grant_blocked_lock_upcall(cache_entry_t        * pentry,
-			       int                    lfd,
 			       int                    mount_root_fd,
                                void                 * powner,
                                fsal_lock_param_t    * plock)
 {
+        cache_inode_status_t cache_status;
+        fsal_file_t *ffile;
+        struct glock glock_args;
+        struct set_get_lock_arg gpfs_sg_arg;
+        int retval;
+
   LogLockDesc(COMPONENT_STATE, NIV_DEBUG,
               "Grant Upcall for", pentry, powner, plock);
 
-  if(!find_blocked_lock_upcall(pentry, powner, plock, STATE_GRANT_FSAL))
-  {
-    cache_inode_status_t   cache_status;
-    cache_status = cache_inode_inc_pin_ref(pentry);
-    int retval;
+        /* If the blocked lock is found, it would be put on to the granted lock
+         * list, and nothing more to do.
+         */
+        if (find_blocked_lock_upcall(pentry, powner, plock, STATE_GRANT_FSAL))
+                return;
 
-    if(cache_status != CACHE_INODE_SUCCESS)
-    { 
-      LogDebug(COMPONENT_STATE,
-               "Could not pin file");
-      return ;
-    }
-    struct glock glock_args;
-    struct set_get_lock_arg gpfs_sg_arg;
+        /* Need to unlock this granted lock. Pin the cache entry and get the
+ * associated file descriptor. If we can't pin the cache entry or can't get
+ * file descriptor, then the file probably got closed, so lock should go away
+ * on its own due to last close, and there is no need to do unlock.
+         */
+        cache_status = cache_inode_inc_pin_ref(pentry);
+        if (cache_status != CACHE_INODE_SUCCESS) {
+                LogDebug(COMPONENT_STATE, "Could not pin file");
+                return;
+        }
+        ffile = cache_inode_fd(pentry);
+        if (ffile == NULL) {
+                LogDebug(COMPONENT_STATE, "Could not get fd");
+                cache_inode_dec_pin_ref(pentry, FALSE);
+                return;
+        }
 
-    glock_args.cmd = F_SETLK;
-    glock_args.flock.l_type = F_UNLCK;
-    glock_args.flock.l_len = plock->lock_length;
-    glock_args.flock.l_start = plock->lock_start;
-    glock_args.flock.l_whence = SEEK_SET;
+        //FSAL_op_Lock vs this?
 
-//    glock_args.lfd = lfd;
-    if (cache_inode_fd(pentry) == NULL)
-    {
-      LogDebug(COMPONENT_STATE,
-               "Could not get fd");
-      cache_inode_dec_pin_ref(pentry, FALSE);
-      return ;
-    }
-    glock_args.lfd = ((gpfsfsal_file_t *)cache_inode_fd(pentry))->fd;
-    glock_args.lock_owner = powner;
-    gpfs_sg_arg.mountdirfd = mount_root_fd;
-    gpfs_sg_arg.lock = &glock_args;
+        glock_args.cmd = F_SETLK;
+        glock_args.flock.l_type = F_UNLCK;
+        glock_args.flock.l_len = plock->lock_length;
+        glock_args.flock.l_start = plock->lock_start;
+        glock_args.flock.l_whence = SEEK_SET;
 
-    retval = gpfs_ganesha(OPENHANDLE_SET_LOCK, &gpfs_sg_arg);
-    LogEvent(COMPONENT_STATE, "unlock %d:%d retval=%d errno=%d\n", glock_args.lfd, gpfs_sg_arg.mountdirfd, retval, errno);
+        glock_args.lfd = ((gpfsfsal_file_t *)ffile)->fd;
+        glock_args.lock_owner = powner;
+        gpfs_sg_arg.mountdirfd = mount_root_fd;
+        gpfs_sg_arg.lock = &glock_args;
 
-    cache_inode_dec_pin_ref(pentry, FALSE);
-  }
+        retval = gpfs_ganesha(OPENHANDLE_SET_LOCK, &gpfs_sg_arg);
+        LogEvent(COMPONENT_STATE, "unlock %d:%d retval=%d errno=%d\n", glock_args.lfd, gpfs_sg_arg.mountdirfd, retval, errno);
+
+        cache_inode_dec_pin_ref(pentry, FALSE);
 }
 
 /**

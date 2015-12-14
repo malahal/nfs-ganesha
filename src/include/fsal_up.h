@@ -102,7 +102,6 @@ typedef struct fsal_up_event_data_lock_grant_t_
 {
   void              * lock_owner;
   fsal_lock_param_t   lock_param;
-  int                 lfd;
   int                 mount_root_fd;
 } fsal_up_event_data_lock_grant_t;
 

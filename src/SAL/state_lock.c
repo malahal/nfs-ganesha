@@ -1635,9 +1635,35 @@ state_status_t cancel_blocked_lock(cache_entry_t        * pentry,
       if(state_status != STATE_SUCCESS)
         {
           /* Unable to cancel, assume that granted upcall is on it's way. */
+          LogFullDebug(COMPONENT_STATE,
+                       "Unable to cancel lock %d", state_status);
           LogEntry("Unable to cancel (grant upcall expected)", lock_entry);
-          return STATE_SUCCESS;
         }
+
+      /* If there is a pending upcall at this point, the
+       * following request will release it. The upcall
+       * processing code can just ignore the granted lock, if
+       * a lock isn't found in the state_blocked_lock list.
+       *
+       * @todo: Maybe an issue if this was a lock upgrade?
+       */
+      state_status = do_lock_op(pentry,
+                                pcontext,
+                                lock_entry->sle_pexport,
+                                FSAL_OP_UNLOCK,
+                                0, /*Not a reclaim */
+                                lock_entry->sle_owner,
+                                &lock_entry->sle_lock,
+                                NULL,   /* no conflict expected */
+                                NULL,
+                                FALSE); /* overlap not relevant */
+      if (state_status != STATE_SUCCESS) {
+              /* lock was probably not granted */
+              LogFullDebug(COMPONENT_STATE,
+                           "Unable to unlock a blocked lock %d",
+                           state_status);
+      }
+      state_status = STATE_SUCCESS;
     }
 
   /* Remove the lock from the lock list*/
@@ -3119,10 +3145,13 @@ void find_blocked_lock_upcall(cache_entry_t        * pentry,
       PTHREAD_RWLOCK_UNLOCK(&pentry->state_lock);
     }
 
-  /* We must be out of sync with FSAL, this is fatal */
-  LogLockDesc(COMPONENT_STATE, NIV_MAJOR,
+    /* It is likely that we got an upcall before the cancel request.
+     * The cancel code will also unlock, so there is nothing to do
+     * even if this is a granted lock.
+     */
+  LogWarn(COMPONENT_STATE, "Grant type == %d\n", grant_type);
+  LogLockDesc(COMPONENT_STATE, NIV_EVENT,
               "Blocked Lock Not Found for", pentry, powner, plock);
-  LogFatal(COMPONENT_STATE, "Locks out of sync with FSAL");
 }
 
 /**

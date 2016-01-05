@@ -359,16 +359,44 @@ void state_del_locked(state_t *state)
 	PTHREAD_MUTEX_unlock(&state->state_mutex);
 
 	if (owner != NULL) {
+		bool owner_retain = false;
+		struct state_nfs4_owner_t *nfs4_owner;
+
+		nfs4_owner = &owner->so_owner.so_nfs4_owner;
+
 		/* Remove from list of states owned by owner and
 		 * release the state owner reference.
 		 */
 		PTHREAD_MUTEX_lock(&owner->so_mutex);
 		PTHREAD_MUTEX_lock(&state->state_mutex);
+
 		glist_del(&state->state_owner_list);
 		state->state_owner = NULL;
+
+		/* If we are dropping the last open state from an open
+		 * owner, we will want to retain a refcount and let the
+		 * reaper thread clean up with owner. */
+		owner_retain = owner->so_type == STATE_OPEN_OWNER_NFSV4 &&
+		    glist_empty(&nfs4_owner->so_state_list);
+
 		PTHREAD_MUTEX_unlock(&state->state_mutex);
 		PTHREAD_MUTEX_unlock(&owner->so_mutex);
-		dec_state_owner_ref(owner);
+
+		if (owner_retain) {
+			/* Retain the reference held by the state, and track
+			 * when this owner was last closed.
+			 */
+			PTHREAD_MUTEX_lock(&cached_open_owners_lock);
+			atomic_store_time_t(&nfs4_owner->cache_expire,
+					    nfs_param.nfsv4_param.lease_lifetime
+						+ time(NULL));
+			glist_add_tail(&cached_open_owners,
+				       &nfs4_owner->so_state_list);
+			PTHREAD_MUTEX_unlock(&cached_open_owners_lock);
+		} else {
+			/* Drop the reference held by the state. */
+			dec_state_owner_ref(owner);
+		}
 	}
 
 	/* Remove from the list of states for a particular cache entry */

@@ -424,6 +424,9 @@ extern hash_table_t *ht_9p_owner;
 #endif
 extern hash_table_t *ht_nfs4_owner;
 
+extern struct glist_head cached_open_owners;
+extern pthread_mutex_t cached_open_owners_lock;
+
 /**
  * @brief A structure identifying the owner of an NFSv4 open or lock state
  *
@@ -573,7 +576,7 @@ struct state_nfs4_owner_t {
 	struct glist_head so_state_list; /*< States owned by this owner */
 	struct glist_head so_perclient;  /*< open owner entry to be
 					   linked to client */
-	time_t last_close_time; /* time last CLOSE op performed */
+	time_t cache_expire; /* time cached OPEN owner will expire */
 };
 
 /**

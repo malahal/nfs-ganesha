@@ -92,14 +92,13 @@ int nfs3_Access(nfs_arg_t *parg,
   fsal_attrib_list_t attr;
   int rc = NFS_REQ_OK;
 
-  if(isDebug(COMPONENT_NFSPROTO))
     {
       char                  str[LEN_FH_STR];
       struct display_buffer dspbuf = {sizeof(str), str, str};
 
       (void) display_fhandle3(&dspbuf, (nfs_fh3 *) parg);
 
-      LogDebug(COMPONENT_NFSPROTO,
+      LogEvent(COMPONENT_NFSPROTO,
                "REQUEST PROCESSING: Calling nfs3_Access handle: %s", str);
     }
 

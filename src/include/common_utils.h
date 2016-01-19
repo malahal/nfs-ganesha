@@ -126,4 +126,6 @@ static inline int strmaxcat(char * dest, char * src, size_t dest_size)
   return 0;
 }
 
+void log_handle(char* desc, char *handle, int handle_len);
+
 #endif

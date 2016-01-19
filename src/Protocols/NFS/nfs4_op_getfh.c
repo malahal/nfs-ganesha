@@ -99,6 +99,10 @@ int nfs4_op_getfh(struct nfs_argop4 *op, compound_data_t * data, struct nfs_reso
   memcpy(res_GETFH.GETFH4res_u.resok4.object.nfs_fh4_val,
          data->currentFH.nfs_fh4_val, data->currentFH.nfs_fh4_len);
 
+  log_handle("nfs4_op_getfh handle:", 
+             data->currentFH.nfs_fh4_val, 
+             data->currentFH.nfs_fh4_len);
+
   return NFS4_OK;
 }                               /* nfs4_op_getfh */
 

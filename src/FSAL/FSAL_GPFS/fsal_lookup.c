@@ -40,6 +40,8 @@
 #include "fsal_internal.h"
 #include "fsal_convert.h"
 #include "FSAL/access_check.h"
+#include <signal.h>
+
 
 /**
  * FSAL_lookup :
@@ -93,6 +95,7 @@ fsal_status_t GPFSFSAL_lookup(fsal_handle_t * p_parent_directory_handle,    /* I
     Return(ERR_FSAL_FAULT, 0, INDEX_FSAL_lookup);
 
   /* get information about root */
+  LogEvent(COMPONENT_FSAL,"ACH: Lookup for %s\n", p_filename->name);
   if(!p_parent_directory_handle)
     {
       gpfsfsal_handle_t *root_handle = &((gpfsfsal_op_context_t *)p_context)->export_context->mount_root_handle;
@@ -103,6 +106,12 @@ fsal_status_t GPFSFSAL_lookup(fsal_handle_t * p_parent_directory_handle,    /* I
              sizeof(root_handle->data.handle.handle_size));
       p_object_handle->data.handle.handle_size = root_handle->data.handle.handle_size;
       p_object_handle->data.handle.handle_key_size = root_handle->data.handle.handle_key_size;
+
+
+      log_handle("GPFSFSAL_lookup: root handle:",
+                 p_object_handle->data.handle.f_handle,
+                 sizeof(p_object_handle->data.handle.f_handle));
+
 
       /* get attributes, if asked */
       if(p_object_attributes)
@@ -117,6 +126,10 @@ fsal_status_t GPFSFSAL_lookup(fsal_handle_t * p_parent_directory_handle,    /* I
       /* Done */
       Return(ERR_FSAL_NO_ERROR, 0, INDEX_FSAL_lookup);
     }
+
+  log_handle("GPFSFSAL_lookup: parent handle:",
+                 p_parent_directory_handle->data.handle.f_handle,
+                 sizeof(p_parent_directory_handle->data.handle.f_handle));
 
   /* retrieve directory attributes */
   TakeTokenFSCall();
@@ -169,7 +182,22 @@ fsal_status_t GPFSFSAL_lookup(fsal_handle_t * p_parent_directory_handle,    /* I
   /* This might be a race, but it's the best we can currently do */
   status = fsal_internal_get_handle_at(parentfd, p_filename, object_handle,
       p_context);
+
+  log_handle("GPFSFSAL_lookup handle:",
+             object_handle->data.handle.f_handle,
+             sizeof(object_handle->data.handle.f_handle));
+
   close(parentfd);
+
+  if (memcmp(p_parent_directory_handle->data.handle.f_handle,
+             object_handle->data.handle.f_handle,
+             sizeof(object_handle->data.handle.f_handle)) == 0) {
+      LogEvent(COMPONENT_FSAL,"ACH: ERROR Duplicate parent and child handles detected.  Raising abort");
+      log_handle("parent:", p_parent_directory_handle->data.handle.f_handle, sizeof(p_parent_directory_handle->data.handle.f_handle));
+      log_handle("child:", object_handle->data.handle.f_handle, sizeof(object_handle->data.handle.f_handle));
+      LogEvent(COMPONENT_FSAL,"ACH: p_filename:%s", p_filename->name); 
+      raise (SIGABRT);
+  }
 
   if(FSAL_IS_ERROR(status))
     ReturnStatus(status, INDEX_FSAL_lookup);

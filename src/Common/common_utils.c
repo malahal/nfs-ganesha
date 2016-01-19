@@ -17,6 +17,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <ctype.h>
+#include <log.h>
 
 /**
  * This function converts a string to an integer.
@@ -181,6 +182,19 @@ int snprintmem(char *target, int tgt_size, caddr_t source, int mem_size)
   return wrote;
 
 }
+
+
+void log_handle(char* desc, char *handle, int handle_len){
+   char str_hdl[handle_len*2+1];
+   int i;
+
+   memset(str_hdl, 0, sizeof(str_hdl));
+   for(i = 0; i < handle_len; i++)
+      sprintf(&str_hdl[i*2], "%02X", *(handle+i));
+   
+   LogEvent(COMPONENT_FSAL,"ACH: desc:%s handle:[%s]", desc, str_hdl);
+}
+
 
 /* test if a letter is hexa */
 #define IS_HEXA( c )  ( (((c) >= '0') && ((c) <= '9')) || (((c) >= 'A') && ((c) <= 'F')) || (((c) >= 'a') && ((c) <= 'f')) )

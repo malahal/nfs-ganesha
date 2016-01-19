@@ -172,6 +172,10 @@ fsal_status_t GPFSFSAL_readdir(fsal_dir_t * dir_desc,       /* IN */
 
   max_dir_entries = (buffersize / sizeof(fsal_dirent_t));
 
+  log_handle("GPFSFSAL_readdir handle:",
+            p_dir_descriptor->handle.data.handle.f_handle,
+            sizeof(p_dir_descriptor->handle.data.handle.f_handle));
+
   /***************************/
   /* seek into the directory */
   /***************************/
@@ -229,10 +233,10 @@ fsal_status_t GPFSFSAL_readdir(fsal_dir_t * dir_desc,       /* IN */
           dp = (struct linux_dirent *)(buff + bpos);
           bpos += dp->d_reclen;
 
-          /* LogFullDebug(COMPONENT_FSAL,
+          LogEvent(COMPONENT_FSAL,
                           "\tino=%8ld|%8lx off=%d|%x reclen=%d|%x name=%s|%d",
                           dp->d_ino, dp->d_ino, (int)dp->d_off, (int)dp->d_off,
-                          dp->d_reclen, dp->d_reclen, dp->d_name, (int)dp->d_name[0]  ) ; */
+                          dp->d_reclen, dp->d_reclen, dp->d_name, (int)dp->d_name[0]  ) ;
 
           if(!(*p_nb_entries < max_dir_entries))
             break;

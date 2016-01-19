@@ -577,7 +577,7 @@ fsal_status_t fsal_internal_get_handle_at(int dfd,      /* IN */
   harg.dfd = dfd;
   harg.flag = 0;
 
-  LogFullDebug(COMPONENT_FSAL,
+  LogEvent(COMPONENT_FSAL,
                "Lookup handle at for %s",
                p_fsalname->name);
   rc = gpfs_ganesha(OPENHANDLE_NAME_TO_HANDLE, &harg);
@@ -589,6 +589,9 @@ fsal_status_t fsal_internal_get_handle_at(int dfd,      /* IN */
     ReturnCode(posix2fsal_error(errno), errno);
   }
 
+  log_handle("fsal_internal_get_handle_at handle:", 
+             p_handle->data.handle.f_handle, 
+             sizeof(p_handle->data.handle.f_handle));
   ReturnCode(ERR_FSAL_NO_ERROR, 0);
 }
 

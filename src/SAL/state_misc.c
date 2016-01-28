@@ -1248,11 +1248,7 @@ state_owner_t *get_state_owner(care_t care, state_owner_t *key,
 
 		/* Refresh an nfs4 open owner if needed. */
 		if (owner->so_type == STATE_OPEN_OWNER_NFSV4) {
-			PTHREAD_MUTEX_lock(&owner->so_mutex);
-
 			refresh_nfs4_open_owner(&owner->so_owner.so_nfs4_owner);
-
-			PTHREAD_MUTEX_unlock(&owner->so_mutex);
 		}
 
 		if (isFullDebug(COMPONENT_STATE)) {

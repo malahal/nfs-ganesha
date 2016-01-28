@@ -703,7 +703,10 @@ void release_openstate(state_owner_t *owner)
 				 */
 
 				/* This cached owner has expired, uncache it. */
+				PTHREAD_MUTEX_unlock(&owner->so_mutex);
 				uncache_nfs4_owner(nfs4_owner);
+				PTHREAD_MUTEX_unlock(&cached_open_owners_lock);
+				return;
 			}
 
 			PTHREAD_MUTEX_unlock(&cached_open_owners_lock);

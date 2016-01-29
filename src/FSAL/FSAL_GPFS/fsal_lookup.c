@@ -86,13 +86,21 @@ fsal_status_t GPFSFSAL_lookup(fsal_handle_t * p_parent_directory_handle,    /* I
    * note : object_attributes is optional
    *        parent_directory_handle may be null for getting FS root.
    */
-  if(!p_object_handle || !p_context)
+  if(!p_object_handle || !p_context) {
+    LogEvent(COMPONENT_FSAL,"ACH: Sanity check failed. parent_directory_handle may be null for getting FS root");
+    LogEvent(COMPONENT_FSAL,"ACH: GPFSFSAL_lookup returns (%s, %s) for filename:%s",      
+                     label_fsal_err(ERR_FSAL_FAULT), msg_fsal_err(ERR_FSAL_FAULT), p_filename==NULL?"NULL":p_filename->name);
     Return(ERR_FSAL_FAULT, 0, INDEX_FSAL_lookup);
+  }
 
   /* filename AND parent handle are NULL => lookup "/" */
   if((p_parent_directory_handle && !p_filename)
-     || (!p_parent_directory_handle && p_filename))
+     || (!p_parent_directory_handle && p_filename)) {
+    LogEvent(COMPONENT_FSAL,"ACH: Sanity check failed. filename AND parent handle are NULL => lookup");
+    LogEvent(COMPONENT_FSAL,"ACH: GPFSFSAL_lookup returns (%s, %s) for filename:%s",            
+                     label_fsal_err(ERR_FSAL_FAULT), msg_fsal_err(ERR_FSAL_FAULT), p_filename==NULL?"NULL":p_filename->name);
     Return(ERR_FSAL_FAULT, 0, INDEX_FSAL_lookup);
+  }
 
   /* get information about root */
   LogEvent(COMPONENT_FSAL,"ACH: Lookup for %s\n", p_filename->name);
@@ -124,6 +132,9 @@ fsal_status_t GPFSFSAL_lookup(fsal_handle_t * p_parent_directory_handle,    /* I
             }
         }
       /* Done */
+      LogEvent(COMPONENT_FSAL,"ACH: GPFSFSAL_lookup returns (%s, %s) for filename:%s",
+                     label_fsal_err(ERR_FSAL_NO_ERROR), msg_fsal_err(ERR_FSAL_NO_ERROR), p_filename->name);
+
       Return(ERR_FSAL_NO_ERROR, 0, INDEX_FSAL_lookup);
     }
 
@@ -166,10 +177,14 @@ fsal_status_t GPFSFSAL_lookup(fsal_handle_t * p_parent_directory_handle,    /* I
     case FSAL_TYPE_XATTR:
       // not a directory 
       close(parentfd);
+      LogEvent(COMPONENT_FSAL,"ACH: GPFSFSAL_lookup returns (%s, %s) for filename:%s",
+                     label_fsal_err(ERR_FSAL_NOTDIR), msg_fsal_err(ERR_FSAL_NOTDIR), p_filename->name);
       Return(ERR_FSAL_NOTDIR, 0, INDEX_FSAL_lookup);
 
     default:
       close(parentfd);
+      LogEvent(COMPONENT_FSAL,"ACH: GPFSFSAL_lookup returns (%s, %s) for filename:%s",
+                     label_fsal_err(ERR_FSAL_SERVERFAULT), msg_fsal_err(ERR_FSAL_SERVERFAULT), p_filename->name);
       Return(ERR_FSAL_SERVERFAULT, 0, INDEX_FSAL_lookup);
     }
 
@@ -199,8 +214,11 @@ fsal_status_t GPFSFSAL_lookup(fsal_handle_t * p_parent_directory_handle,    /* I
       raise (SIGABRT);
   }
 
-  if(FSAL_IS_ERROR(status))
+  if(FSAL_IS_ERROR(status)) {
+    LogEvent(COMPONENT_FSAL,"ACH: GPFSFSAL_lookup returns (%s, %s) for filename:%s",
+                     label_fsal_err(status.major), msg_fsal_err(status.minor), p_filename->name);
     ReturnStatus(status, INDEX_FSAL_lookup);
+  }
 
   /* get object attributes */
   if(p_object_attributes)
@@ -214,6 +232,8 @@ fsal_status_t GPFSFSAL_lookup(fsal_handle_t * p_parent_directory_handle,    /* I
     }
 
   /* lookup complete ! */
+  LogEvent(COMPONENT_FSAL,"ACH: GPFSFSAL_lookup returns (%s, %s) for filename:%s",
+                     label_fsal_err(ERR_FSAL_NO_ERROR), msg_fsal_err(ERR_FSAL_NO_ERROR), p_filename->name);
   Return(ERR_FSAL_NO_ERROR, 0, INDEX_FSAL_lookup);
 }
 

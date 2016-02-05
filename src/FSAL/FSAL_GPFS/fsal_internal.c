@@ -586,12 +586,16 @@ fsal_status_t fsal_internal_get_handle_at(int dfd,      /* IN */
   {
     if (errno == EUNATCH)
       LogFatal(COMPONENT_FSAL, "GPFS Returned EUNATCH");
+      LogEvent(COMPONENT_FSAL,"ACH: fsal_internal_get_handle_at returns (%s, %s) ",
+                     label_fsal_err(posix2fsal_error(errno)), msg_fsal_err(errno));
     ReturnCode(posix2fsal_error(errno), errno);
   }
 
   log_handle("fsal_internal_get_handle_at handle:", 
              p_handle->data.handle.f_handle, 
              sizeof(p_handle->data.handle.f_handle));
+  LogEvent(COMPONENT_FSAL,"ACH: fsal_internal_get_handle_at returns (%s, %s)",
+                     label_fsal_err(ERR_FSAL_NO_ERROR), msg_fsal_err(0));
   ReturnCode(ERR_FSAL_NO_ERROR, 0);
 }
 

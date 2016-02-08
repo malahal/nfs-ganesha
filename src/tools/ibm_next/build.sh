@@ -7,7 +7,7 @@ OPTS="$OPTS --enable-stat-exporter"
 OPTS="$OPTS --enable-fsal-up"
 OPTS="$OPTS --with-nfs4-minorversion=0"
 OPTS="$OPTS --enable-nfs4-acl"
-OPTS="$OPTS --enable-mspac"
+OPTS="$OPTS --disable-mspac"
 OPTS="$OPTS --prefix=/usr"
 ./configure $OPTS
 make rpm

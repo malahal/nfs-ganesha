@@ -163,8 +163,13 @@ fsal_status_t GPFSFSAL_readdir(fsal_dir_t * dir_desc,       /* IN */
   /* sanity checks */
   /*****************/
 
-  if(!p_dir_descriptor || !p_pdirent || !p_end_position || !p_nb_entries || !p_end_of_dir)
+  if(!p_dir_descriptor || !p_pdirent || !p_end_position || !p_nb_entries || !p_end_of_dir) {
+    LogEvent(COMPONENT_FSAL,                                   
+                     "GPFSFSAL_readdir Sanity check failed.  Returning (%s, %s, %d)",  
+                     label_fsal_err(ERR_FSAL_FAULT), msg_fsal_err(ERR_FSAL_FAULT), 0); 
+
     Return(ERR_FSAL_FAULT, 0, INDEX_FSAL_readdir);
+  }
 
 #ifdef _VALGRIND_MEMCHECK
   memset(p_pdirent, 0, buffersize);
@@ -195,6 +200,9 @@ fsal_status_t GPFSFSAL_readdir(fsal_dir_t * dir_desc,       /* IN */
   if(rc)
     {
       gpfs_healthcheck(p_dir_descriptor->fd, rc);
+      LogEvent(COMPONENT_FSAL,                                    
+                     "GPFSFSAL_readdir Bad seek position.  Returning (%s, %s, %d)", 
+                     label_fsal_err(rc), msg_fsal_err(rc), rc);
       Return(posix2fsal_error(rc), rc, INDEX_FSAL_readdir);
     }
 
@@ -215,6 +223,9 @@ fsal_status_t GPFSFSAL_readdir(fsal_dir_t * dir_desc,       /* IN */
         {
           rc = errno;
           gpfs_healthcheck(p_dir_descriptor->fd, rc);
+          LogEvent(COMPONENT_FSAL,                                    
+                     "GPFSFSAL_readdir Bad syscall.  Returning (%s, %s, %d)", 
+                     label_fsal_err(rc), msg_fsal_err(rc), rc);
           Return(posix2fsal_error(rc), rc, INDEX_FSAL_readdir);
         }
       /* End of directory */
@@ -249,8 +260,12 @@ fsal_status_t GPFSFSAL_readdir(fsal_dir_t * dir_desc,       /* IN */
           if(FSAL_IS_ERROR
              (st =
               FSAL_str2name(dp->d_name, 0,
-                            &(p_pdirent[*p_nb_entries].name))))
+                            &(p_pdirent[*p_nb_entries].name)))) {
+            LogEvent(COMPONENT_FSAL,
+                     "GPFSFSAL_readdir failed to build full path of the file.  Returning (%s, %s, %d)",
+                     label_fsal_err(st.major), msg_fsal_err(st.major), st.minor);
             ReturnStatus(st, INDEX_FSAL_readdir);
+          }
 
           ((gpfsfsal_cookie_t *)(&p_pdirent[*p_nb_entries].cookie))->data.cookie = dp->d_off;
           p_pdirent[*p_nb_entries].nextentry = NULL;
@@ -263,6 +278,10 @@ fsal_status_t GPFSFSAL_readdir(fsal_dir_t * dir_desc,       /* IN */
 
         }                       /* for */
     }                           /* While */
+
+  LogEvent(COMPONENT_FSAL,
+                     "GPFSFSAL_readdir Normal exit.  Returning (%s, %s, %d)",
+                     label_fsal_err(ERR_FSAL_NO_ERROR), msg_fsal_err(ERR_FSAL_NO_ERROR), 0);
 
   Return(ERR_FSAL_NO_ERROR, 0, INDEX_FSAL_readdir);
 

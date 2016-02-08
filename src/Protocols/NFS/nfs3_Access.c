@@ -106,6 +106,7 @@ int nfs3_Access(nfs_arg_t *parg,
   if(nfs3_Is_Fh_Xattr(&(parg->arg_access3.object)))
     {
       rc = nfs3_Access_Xattr(parg, pexport, pcontext, preq, pres);
+      LogEvent(COMPONENT_NFSPROTO,"ACH: Failed to find out if this is xattr");
       goto out;
     }
 
@@ -118,6 +119,7 @@ int nfs3_Access(nfs_arg_t *parg,
                         &fsal_data.fh_desc, pcontext) == 0)
     {
       rc = NFS_REQ_DROP;
+      LogEvent(COMPONENT_NFSPROTO,"ACH: Failed to convert fhandle to fsal.  dropping");
       goto out;
     }
 
@@ -128,6 +130,7 @@ int nfs3_Access(nfs_arg_t *parg,
                                NULL,
                                &cache_status)) == NULL)
     {
+        LogEvent(COMPONENT_NFSPROTO,"ACH: Failed to get cache inode");
         goto out_error;
     }
 
@@ -150,6 +153,7 @@ int nfs3_Access(nfs_arg_t *parg,
 
       pres->res_access3.status = NFS3_OK;
       rc = NFS_REQ_OK;
+      LogEvent(COMPONENT_NFSPROTO,"ACH: got handle from cache");
       goto out;
     }
 
@@ -171,6 +175,7 @@ out:
       cache_inode_put(pentry);
     }
 
+  LogEvent(COMPONENT_NFSPROTO,"ACH: Returning %d", rc);
   return rc;
 }                               /* nfs3_Access */
 

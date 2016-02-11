@@ -475,7 +475,7 @@ fsal_status_t GPFSFSAL_GetXAttrIdByName(fsal_handle_t * p_objecthandle,     /* I
   else
     Return(ERR_FSAL_NOENT, ENOENT, INDEX_FSAL_GetXAttrValue);
 #endif
-
+  LogEvent(COMPONENT_FSAL,"ACH %s:%d: Returning ERR_FSAL_NOENT", __FILE__, __LINE__);
   Return(ERR_FSAL_NOENT, 0, INDEX_FSAL_GetXAttrValue);
 }                               /* FSAL_GetXAttrIdByName */
 
@@ -520,6 +520,7 @@ fsal_status_t GPFSFSAL_GetXAttrValueByName(fsal_handle_t * p_objecthandle,  /* I
     }
 #endif
   /* not found */
+  LogEvent(COMPONENT_FSAL,"ACH %s:%d: Returning ERR_FSAL_NOENT", __FILE__, __LINE__);
   Return(ERR_FSAL_NOENT, 0, INDEX_FSAL_GetXAttrValue);
 
 }

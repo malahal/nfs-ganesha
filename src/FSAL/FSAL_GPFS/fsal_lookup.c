@@ -82,6 +82,8 @@ fsal_status_t GPFSFSAL_lookup(fsal_handle_t * p_parent_directory_handle,    /* I
   fsal_attrib_list_t parent_dir_attrs;
   gpfsfsal_handle_t *p_object_handle = (gpfsfsal_handle_t *)object_handle;
 
+  logbacktrace();
+
   /* sanity checks
    * note : object_attributes is optional
    *        parent_directory_handle may be null for getting FS root.

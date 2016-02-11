@@ -91,12 +91,15 @@ cache_inode_lookupp_impl(cache_entry_t *entry,
      /* Set the return default to CACHE_INODE_SUCCESS */
      *status = CACHE_INODE_SUCCESS;
 
+     LogEvent(COMPONENT_CACHE_INODE,"ACH: Enter function");
+
      /* Never even think of calling FSAL_lookup on root/.. */
      if(entry == context->export_context->fe_export->exp_root_cache_inode) {
           /* This entry is the root of the current export, so if we get
            * this far, return itself. Note that NFS v4 LOOKUPP will not
            * come here, it catches the root entry earlier.
            */
+           LogEvent(COMPONENT_CACHE_INODE,"ACH: This is the root inode");
 
           /* Bump the refcount on the current entry (so the caller's
              releasing decrementing it doesn't take us below the
@@ -109,6 +112,7 @@ cache_inode_lookupp_impl(cache_entry_t *entry,
                         "Unable to increment reference count on an entry that "
                         "on which we should have a referenced.");
           }
+          LogEvent(COMPONENT_CACHE_INODE,"ACH: exit OK");
           return entry;
      }
 
@@ -117,6 +121,7 @@ cache_inode_lookupp_impl(cache_entry_t *entry,
      parent = cache_inode_weakref_get(&entry->object.dir.parent,
                                       LRU_REQ_INITIAL);
      if (!parent) {
+          LogEvent(COMPONENT_CACHE_INODE,"ACH: didnt find the parent");
           /* If we didn't find it, drop the read lock, get a write
              lock, and make sure nobody filled it in while we waited. */
           PTHREAD_RWLOCK_UNLOCK(&entry->content_lock);
@@ -126,6 +131,7 @@ cache_inode_lookupp_impl(cache_entry_t *entry,
      }
 
      if (!parent) {
+          LogEvent(COMPONENT_CACHE_INODE,"ACH: Still didnt find the parent");
           fsal_handle_t parent_handle;
           memset(&parent_handle, 0, sizeof(fsal_handle_t));
 
@@ -136,12 +142,14 @@ cache_inode_lookupp_impl(cache_entry_t *entry,
                            context, &parent_handle, &object_attributes);
 
           if(FSAL_IS_ERROR(fsal_status)) {
+               LogEvent(COMPONENT_CACHE_INODE,"ACH: Lookup failed");
                if (fsal_status.major == ERR_FSAL_STALE) {
                     LogEvent(COMPONENT_CACHE_INODE,
                        "FSAL returned STALE from lookup.");
                     cache_inode_kill_entry(entry);
                }
                *status = cache_inode_error_convert(fsal_status);
+               LogEvent(COMPONENT_CACHE_INODE,"ACH: Return NULL.  status: %s", msg_fsal_err(fsal_status.minor));
                return NULL;
           }
 
@@ -160,6 +168,7 @@ cache_inode_lookupp_impl(cache_entry_t *entry,
                                        context,
                                        entry,
                                        status)) == NULL) {
+               LogEvent(COMPONENT_CACHE_INODE,"ACH: failed to get parent handle.  Return NULL");
                return NULL;
           }
 
@@ -167,6 +176,7 @@ cache_inode_lookupp_impl(cache_entry_t *entry,
           entry->object.dir.parent = parent->weakref;
      }
 
+     LogEvent(COMPONENT_CACHE_INODE,"ACH: normal exit.  status: %s", msg_fsal_err(fsal_status.minor));
      return parent;
 } /* cache_inode_lookupp_impl */
 

@@ -152,11 +152,14 @@ nfs3_Readdirplus(nfs_arg_t *arg,
                component = COMPONENT_NFSPROTO;
           } else {
                component = COMPONENT_NFS_READDIR;
-               LogDebug(component,
-                        "REQUEST PROCESSING: Calling nfs3_Readdirplus "
-                        " handle: %s", str);
           }
+          LogDebug(component,
+                   "REQUEST PROCESSING: Calling nfs3_Readdirplus "
+                   " handle: %s", str);
+          LogEvent(COMPONENT_NFS_READDIR, "ACH: COMPONENT_NFS_READDIR IS debug");
      }
+     else 
+        LogEvent(COMPONENT_NFS_READDIR, "ACH: COMPONENT_NFS_READDIR is not debug");
 
      /* to avoid setting it on each error case */
      res->res_readdir3.READDIR3res_u.resfail
@@ -185,10 +188,13 @@ nfs3_Readdirplus(nfs_arg_t *arg,
 
      /* Is this a xattr FH ? */
      if (nfs3_Is_Fh_Xattr(&(arg->arg_readdirplus3.dir))) {
+	  LogEvent(COMPONENT_NFS_READDIR,"ACH: this a xattr FH ");
           rc = nfs3_Readdirplus_Xattr(arg, export, context,
                                       req, res);
           goto out;
      }
+     else
+ 	  LogEvent(COMPONENT_NFS_READDIR,"ACH: not an xattr FH");
 
      /* Convert file handle into a vnode */
      if ((dir_entry
@@ -261,6 +267,7 @@ nfs3_Readdirplus(nfs_arg_t *arg,
 
      if (begin_cookie == 0) {
           /* Fill in "." */
+          LogEvent(COMPONENT_NFS_READDIR,"ACH: begin cookie.  Fill in .");
           if (!(nfs3_readdirplus_callback(&cb_opaque,
                                           ".",
                                           dir_entry,
@@ -275,12 +282,14 @@ nfs3_Readdirplus(nfs_arg_t *arg,
 
      /* Fill in ".." */
      if (begin_cookie <= 1) {
+          LogEvent(COMPONENT_NFS_READDIR,"ACH: begin cookie.  fill in ..");
           fsal_attrib_list_t parent_dir_attr;
           cache_entry_t *parent_dir_entry
                = cache_inode_lookupp(dir_entry,
                                      context,
                                      &cache_status_gethandle);
           if (parent_dir_entry == NULL) {
+               LogEvent(COMPONENT_NFS_READDIR,"ACH: null parent dir");
                res->res_readdirplus3.status
                     = nfs3_Errno(cache_status_gethandle);
                rc = NFS_REQ_OK;
@@ -298,6 +307,7 @@ nfs3_Readdirplus(nfs_arg_t *arg,
                     = nfs3_Errno(cache_status_gethandle);
                cache_inode_lru_unref(parent_dir_entry, 0);
                rc = NFS_REQ_OK;
+               LogEvent(COMPONENT_NFS_READDIR,"ACH: cache_inode_getattr failed");
                goto out;
           }
           if (!(nfs3_readdirplus_callback(&cb_opaque,
@@ -309,6 +319,7 @@ nfs3_Readdirplus(nfs_arg_t *arg,
                res->res_readdirplus3.status = cb_opaque.error;
                cache_inode_lru_unref(parent_dir_entry, 0);
                rc = NFS_REQ_OK;
+               LogEvent(COMPONENT_NFS_READDIR,"ACH: readdirplu callback for .. failed");
                goto out;
           }
           cache_inode_lru_unref(parent_dir_entry, 0);
@@ -329,6 +340,7 @@ nfs3_Readdirplus(nfs_arg_t *arg,
                                    &res->res_readdirplus3.status,
                                    &(res->res_readdirplus3.READDIRPLUS3res_u.resfail.dir_attributes),
                                    NULL, NULL, NULL, NULL);
+          LogEvent(COMPONENT_NFS_READDIR,"ACH: cache inode readdir failed");
           goto out;
      }
      LogFullDebug(COMPONENT_NFS_READDIR,
@@ -381,6 +393,7 @@ out:
           free_entryplus3s(cb_opaque.entries);
      }
 
+     LogEvent(COMPONENT_NFS_READDIR,"ACH: return %d", rc);
      return rc;
 }                               /* nfs3_Readdirplus */
 

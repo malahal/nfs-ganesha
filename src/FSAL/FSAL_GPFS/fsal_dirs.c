@@ -163,6 +163,8 @@ fsal_status_t GPFSFSAL_readdir(fsal_dir_t * dir_desc,       /* IN */
   /* sanity checks */
   /*****************/
 
+  logbacktrace();
+
   if(!p_dir_descriptor || !p_pdirent || !p_end_position || !p_nb_entries || !p_end_of_dir) {
     LogEvent(COMPONENT_FSAL,                                   
                      "GPFSFSAL_readdir Sanity check failed.  Returning (%s, %s, %d)",  

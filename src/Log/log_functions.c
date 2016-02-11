@@ -2530,9 +2530,13 @@ int read_log_config(config_file_t in_config)
   struct log_facility * facility;
   char *logfile_name = NULL;
 
+  LogEvent(COMPONENT_CONFIG,"ACH: parsing log config");
+
   /* Is the config tree initialized ? */
-  if(in_config == NULL)
+  if(in_config == NULL) {
+    LogEvent(COMPONENT_CONFIG,"ACH: No in config");
     return -1;
+  }
 
   /* Get the config BLOCK */
   if((block = config_FindItemByName(in_config, CONF_LABEL_LOG)) == NULL)
@@ -2730,6 +2734,7 @@ int read_log_config(config_file_t in_config)
               continue;
             }
 
+          LogEvent(COMPONENT_CONFIG,"ACH: Setting %s(%d) to %s(%d)", key_value,component,key_name,level);
           SetComponentLogLevel(component, level);
 
           continue;

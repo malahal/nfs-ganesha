@@ -448,7 +448,10 @@ nfs3_readdirplus_callback(void* opaque,
      struct fsal_handle_desc id_descriptor
           = {sizeof(ep3->fileid), (caddr_t) &ep3->fileid};
 
+     LogEvent(COMPONENT_NFS_READDIR,"ACH: Enter function");
+
      if (tracker->count == tracker->total_entries) {
+          LogEvent(COMPONENT_NFS_READDIR,"ACH: tracer count matches entries.  exit false");
           return FALSE;
      }
      /* This is a pessimistic check, which assumes that we're going
@@ -456,6 +459,7 @@ nfs3_readdirplus_callback(void* opaque,
       * we're close enough to the buffer size limit and t's time to 
       * stop anyway */
      if ((tracker->mem_left < (sizeof(entryplus3) + namelen + NFS3_FHSIZE))) {
+          LogEvent(COMPONENT_NFS_READDIR,"ACH: buffer full, exit false");
           if (tracker->count == 0) {
                tracker->error = NFS3ERR_TOOSMALL;
           }
@@ -475,8 +479,10 @@ nfs3_readdirplus_callback(void* opaque,
      ep3->name = gsh_strdup(name);
      if (ep3->name == NULL) {
           tracker->error = NFS3ERR_IO;
+          LogEvent(COMPONENT_NFS_READDIR,"ACH: bad name. return false");
           return FALSE;
      }
+     LogEvent(COMPONENT_NFS_READDIR,"ACH: name: %s", ep3->name);
 
      ep3->cookie = cookie;
 
@@ -484,6 +490,7 @@ nfs3_readdirplus_callback(void* opaque,
      tracker->mem_left -= sizeof(ep3->cookie) + ((namelen + 3) & ~3) + 4;
 
      if(attr_allowed) {
+          LogEvent(COMPONENT_NFS_READDIR,"ACH: attr_allowed");
           ep3->name_handle.handle_follows = TRUE;
           ep3->name_handle.post_op_fh3_u.handle.data.data_val
                = gsh_malloc(NFS3_FHSIZE);
@@ -498,15 +505,22 @@ nfs3_readdirplus_callback(void* opaque,
           if (nfs3_FSALToFhandle(&ep3->name_handle.post_op_fh3_u.handle,
                                  &entry->handle,
                                  tracker->export) == 0) {
+               LogEvent(COMPONENT_NFS_READDIR,"ACH: nfs3_FSALToFhandle failed.  return false");
                tracker->error = NFS3ERR_BADHANDLE;
                gsh_free(ep3->name);
                gsh_free(ep3->name_handle.post_op_fh3_u.handle.data.data_val);
                return FALSE;
           }
 
+          log_handle("nfs3_readdirplus_callback: handle:",
+                ep3->name_handle.post_op_fh3_u.handle.data.data_val,
+                ep3->name_handle.post_op_fh3_u.handle.data.data_len);
+
+
           /* Account for filehande + length + follows + nextentry */
           tracker->mem_left -= ep3->name_handle.post_op_fh3_u.handle.data.data_len + 12;
      } else {
+          LogEvent(COMPONENT_NFS_READDIR,"ACH: attr not allowed");
           ep3->name_handle.handle_follows = FALSE;
 	  tracker->mem_left -= sizeof(ep3->name_handle.handle_follows);
      }
@@ -526,6 +540,7 @@ nfs3_readdirplus_callback(void* opaque,
           tracker->entries[tracker->count - 1].nextentry = ep3;
      }
      ++(tracker->count);
+     LogEvent(COMPONENT_NFS_READDIR,"ACH: nfs3_FSALToFhandle: normal exit");
      return TRUE;
 } /* nfs3_readdirplus_callback */
 

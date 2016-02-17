@@ -53,15 +53,21 @@ fsal_status_t  schedule_fsal_up_event_process(fsal_up_event_t *arg)
   if (arg->event_type == FSAL_UP_EVENT_LOCK_GRANT ||
       arg->event_type == FSAL_UP_EVENT_LOCK_AVAIL)
     {
+      LogEvent(COMPONENT_FSAL_UP,
+                   "ACH: Process lock events now");
       arg->event_process_func(&arg->event_data);
 
       gsh_free(arg->event_data.event_context.fsal_data.fh_desc.start);
       pool_free(fsal_up_event_pool, arg);
+      LogEvent(COMPONENT_FSAL_UP,
+                   "ACH: Done");
       return ret;
     }
 
   if(arg->event_type == FSAL_UP_EVENT_INVALIDATE)
     {
+      LogEvent(COMPONENT_FSAL_UP,
+                   "ACH: Deffer invalidate operation");
       arg->event_process_func(&arg->event_data);
       /* Step2 where we perform close; which could be expensive operation
          so deffer it to the separate thread. */
@@ -71,6 +77,8 @@ fsal_status_t  schedule_fsal_up_event_process(fsal_up_event_t *arg)
   {
 
    /* Invalidate first without scheduling */
+    LogEvent(COMPONENT_FSAL_UP,
+                   "ACH: Deffer update operation");
     arg->event_process_func(&arg->event_data);
 
     if ((arg->event_data.type.update.upu_flags & FSAL_UP_NLINK) &&
@@ -84,6 +92,8 @@ fsal_status_t  schedule_fsal_up_event_process(fsal_up_event_t *arg)
     else
     {
       /* event processed and no need for step2 action , free memory here */
+      LogEvent(COMPONENT_FSAL_UP,
+                   "ACH: Event processed.  Done");
       gsh_free(arg->event_data.event_context.fsal_data.fh_desc.start);
       pool_free(fsal_up_event_pool, arg);
       return ret;
@@ -105,6 +115,8 @@ fsal_status_t  schedule_fsal_up_event_process(fsal_up_event_t *arg)
       ret.major = ERR_FSAL_FAULT;
     }
   V(fsal_up_process_tcb.tcb_mutex);
+  LogEvent(COMPONENT_FSAL_UP,
+                   "ACH: Exit: %s", msg_fsal_err(ret.major));
   return ret;
 }
 

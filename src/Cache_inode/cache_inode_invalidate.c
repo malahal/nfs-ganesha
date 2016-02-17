@@ -81,8 +81,11 @@ cache_inode_invalidate(cache_inode_fsal_data_t *fsal_data,
      cache_entry_t *entry;
      struct hash_latch latch;
 
+     LogEvent(COMPONENT_CACHE_INODE,"ACH: Enter") ;
+
      if (status == NULL || fsal_data == NULL) {
           *status = CACHE_INODE_INVALID_ARGUMENT;
+          LogEvent(COMPONENT_CACHE_INODE,"ACH: Invalid Argument") ;
           goto out;
      }
 
@@ -103,6 +106,7 @@ cache_inode_invalidate(cache_inode_fsal_data_t *fsal_data,
           /* Entry is not cached */
           HashTable_ReleaseLatched(fh_to_cache_entry_ht, &latch);
           *status = CACHE_INODE_NOT_FOUND;
+          LogEvent(COMPONENT_CACHE_INODE,"ACH: Entry not cached.  Exit CACHE_INODE_NOT_FOUND") ;
           return *status;
      } else if (rc != HASHTABLE_SUCCESS) {
           LogCrit(COMPONENT_CACHE_INODE,
@@ -115,6 +119,7 @@ cache_inode_invalidate(cache_inode_fsal_data_t *fsal_data,
      if (cache_inode_lru_ref(entry, 0) != CACHE_INODE_SUCCESS) {
           HashTable_ReleaseLatched(fh_to_cache_entry_ht, &latch);
           *status = CACHE_INODE_NOT_FOUND;
+          LogEvent(COMPONENT_CACHE_INODE,"ACH: Failed to get entry.  Exit CACHE_INODE_NOT_FOUND") ;
           return *status;
      }
      HashTable_ReleaseLatched(fh_to_cache_entry_ht, &latch);
@@ -132,11 +137,13 @@ cache_inode_invalidate(cache_inode_fsal_data_t *fsal_data,
         without invalidating content (since any change in content
         really ought to modify mtime, at least.) */
 
-     if ((flags & CACHE_INODE_INVALIDATE_CLEARBITS) != 0)
+     if ((flags & CACHE_INODE_INVALIDATE_CLEARBITS) != 0) {
+       LogEvent(COMPONENT_CACHE_INODE,"ACH: Clear bits") ;
        atomic_clear_uint32_t_bits(&entry->flags,
                                   CACHE_INODE_TRUST_ATTRS |
                                   CACHE_INODE_DIR_POPULATED |
                                   CACHE_INODE_TRUST_CONTENT);
+     }
 
      /* The main reason for holding the lock at this point is so we
         don't clear the trust bits while someone is populating the
@@ -144,6 +151,7 @@ cache_inode_invalidate(cache_inode_fsal_data_t *fsal_data,
 
      if (((flags & CACHE_INODE_INVALIDATE_CLOSE) != 0) &&
          (entry->type == REGULAR_FILE)) {
+          LogEvent(COMPONENT_CACHE_INODE,"ACH: close entry") ;
           cache_inode_close(entry,
                             NULL,
                             (CACHE_INODE_FLAG_REALLYCLOSE |
@@ -162,5 +170,6 @@ out:
      /* Memory copying attributes with every call is expensive.
         Let's not do it.  */
 
+     LogEvent(COMPONENT_CACHE_INODE,"ACH: Normal exit") ;
      return (*status);
 } /* cache_inode_invalidate */

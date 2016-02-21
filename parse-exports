@@ -1,0 +1,86 @@
+#!/usr/bin/env python
+
+import sys
+
+def main(f):
+    for export in exports(f):
+        print export
+
+# Export block generator.  It is a non-trivial task to validate the
+# config file and there is no point in pretending to do so! Tries to
+# grab as many export blocks as possible even with invalid config, so
+# only pass valid config file!
+#
+# Also assumes that block terminating closing curly brace is in a line
+# by itself.
+def exports(iterable):
+    export_block = False
+    client_block = False
+    fsal_block = False
+    export = {}
+    client = {}
+    export['client_blocks'] = []
+
+    for line in iterable:
+        # Pass block comments, inline comments are not handled
+        # yet - malahal!
+        line = line.lstrip()
+        if line.startswith('#'):
+            continue
+
+        # check for "key = value;" line
+        try:
+            key, value = line.split('=')
+        except ValueError:
+            pass
+        else:
+            if fsal_block:
+                pass        # we don't parse FSAL block
+            elif client_block:
+                client[key.rstrip()] = value.strip().rstrip(';')
+            elif export_block:
+                export[key.rstrip()] = value.strip().rstrip(';')
+            continue
+
+        # Check for block beginnings
+        if line.startswith('EXPORT'):
+            export_block = True
+            continue
+        if line.startswith('CLIENT'):
+            client_block = True
+            continue
+        if line.startswith('FSAL'):
+            fsal_block = True
+            continue
+
+        # Check for block endings, check fsal, client and export in that
+        # order
+        if line.startswith('}'):
+            if fsal_block: # end of FSAL block
+                fsal_block = False
+                continue
+
+            if client_block: # end of CLIENT block
+                client_block = False
+                # Add the current client block to the export dictionary
+                export['client_blocks'].append(client)
+                client = {} # for next client block
+                continue
+
+            if export_block: # end of EXPORT block
+                # Return the dictionary and initialize state for the next call
+                yield export
+                export_block = False
+                client_block = False
+                fsal_block = False
+                export = {}
+                client = {}
+                export['client_blocks'] = []
+
+
+if __name__ == '__main__':
+    if len(sys.argv) != 2:
+        sys.exit('\tUsage: %s' % sys.argv[0])
+
+    with open(sys.argv[1]) as f:
+        main(f)

@@ -1605,9 +1605,13 @@ int worker_init(void)
 	frp.wake_threads = nfs_rpc_queue_awaken;
 	frp.wake_threads_arg = &nfs_req_st;
 
-	if (nfs_param.core_param.nb_worker != N_REQ_QUEUES) {
+	/* nfs_param.core_param.nb_worker is a positive number from the
+	 * config checks, but it also must be a power of 2
+	 */
+	if (nfs_param.core_param.nb_worker &
+			(nfs_param.core_param.nb_worker - 1)) {
 		LogFatal(COMPONENT_DISPATCH,
-			 "Worker threads must be equal to N_REQ_QUEUES\n");
+			 "Worker threads must be a power of 2\n");
 	}
 	rc = fridgethr_init(&worker_fridge, "Wrk", &frp);
 	if (rc != 0) {

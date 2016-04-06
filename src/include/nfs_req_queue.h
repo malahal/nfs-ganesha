@@ -55,12 +55,13 @@ struct req_q_pair {
 	GSH_CACHE_PAD(2);
 };
 
-#define N_REQ_QUEUES 256 /* power of 2 would be better */
-
-extern const char *req_q_s[N_REQ_QUEUES];	/* for debug prints */
+/* The number of queues should be same as the number of worker threads.
+ * Must be a power of 2 as we bitwise-AND operation for modulo arithmetic.
+ */
+#define N_REQ_QUEUES nfs_param.core_param.nb_worker
 
 struct req_q_set {
-	struct req_q_pair qset[N_REQ_QUEUES];
+	struct req_q_pair *qset;
 };
 struct qwait {
 	pthread_mutex_t wait_mutex;
@@ -73,7 +74,7 @@ struct nfs_req_st {
 		uint32_t ctr;
 		struct req_q_set nfs_request_q;
 		uint64_t size;
-		struct qwait qwait[N_REQ_QUEUES];
+		struct qwait *qwait;
 	} reqs;
 	GSH_CACHE_PAD(1);
 	struct {

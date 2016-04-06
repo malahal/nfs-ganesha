@@ -79,13 +79,6 @@ static struct rpc_evchan rpc_evchan[N_EVENT_CHAN];
 struct fridgethr *req_fridge;	/*< Decoder thread pool */
 struct nfs_req_st nfs_req_st;	/*< Shared request queues */
 
-const char *req_q_s[N_REQ_QUEUES] = {
-	"REQ_Q_MOUNT",
-	"REQ_Q_CALL",
-	"REQ_Q_LOW_LATENCY",
-	"REQ_Q_HIGH_LATENCY"
-};
-
 static u_int nfs_rpc_recv_user_data(SVCXPRT *xprt, SVCXPRT *newxprt,
 				    const u_int flags, void *u_data);
 static bool nfs_rpc_getreq_ng(SVCXPRT *xprt /*, int chan_id */);
@@ -1182,6 +1175,19 @@ void nfs_rpc_queue_init(void)
 
 	/* queues */
 	nfs_req_st.reqs.size = 0;
+	nfs_req_st.reqs.qwait = gsh_calloc(N_REQ_QUEUES, sizeof(struct qwait));
+	nfs_req_st.reqs.nfs_request_q.qset = gsh_calloc(N_REQ_QUEUES,
+						sizeof(struct req_q_pair));
+	/* N_REQ_QUEUES (nfs_param.core_param.nb_worker) must be initialized
+	 * by now. This check is to guard any inadvertent changes that could
+	 * make this assumption invalid.
+	 */
+	if (N_REQ_QUEUES == 0 || nfs_req_st.reqs.qwait == NULL ||
+			nfs_req_st.reqs.nfs_request_q.qset == NULL)
+		LogFatal(COMPONENT_DISPATCH,
+			 "Memory allocation for queues (%d) failed",
+			 N_REQ_QUEUES);
+
 	for (ix = 0; ix < N_REQ_QUEUES; ++ix) {
 		PTHREAD_MUTEX_init(&nfs_req_st.reqs.qwait[ix].wait_mutex, NULL);
 		PTHREAD_COND_init(&nfs_req_st.reqs.qwait[ix].wait_cond, NULL);
@@ -1237,7 +1243,7 @@ void nfs_rpc_enqueue_req(request_data_t *reqdata)
 			     reqdata->r_u.req.svc.rq_xid,
 			     reqdata->r_u.req.lookahead.flags);
 
-		slot = atomic_inc_uint32_t(&mslot) % N_REQ_QUEUES;
+		slot = atomic_inc_uint32_t(&mslot) & (N_REQ_QUEUES - 1);
 		qpair = &(nfs_request_q->qset[slot]);
 		break;
 #ifdef _USE_9P
@@ -1373,7 +1379,7 @@ request_data_t *nfs_rpc_dequeue_req(nfs_worker_data_t *worker)
 	/* XXX: the following stands in for a more robust/flexible
 	 * weighting function */
 
-	slot = worker->worker_index % N_REQ_QUEUES;
+	slot = worker->worker_index & (N_REQ_QUEUES - 1);
 	qpair = &(nfs_request_q->qset[slot]);
 
 	LogFullDebug(COMPONENT_DISPATCH,

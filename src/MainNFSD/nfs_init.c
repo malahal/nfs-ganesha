@@ -68,6 +68,7 @@
 #include <sys/capability.h>	/* For capget/capset */
 #endif
 #include "uid2grp.h"
+#include "netgroup_cache.h"
 #include "pnfs_utils.h"
 
 /* global information exported to all layers (as extern vars) */
@@ -328,6 +329,8 @@ int init_server_pkgs(void)
 
 	/* init uid2grp cache */
 	uid2grp_cache_init();
+
+	ng_cache_init(); /* netgroup cache */
 
 	/* Cache Inode Initialisation */
 	cache_status = cache_inode_init();

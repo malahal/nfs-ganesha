@@ -938,6 +938,7 @@ set(GANESHA_CORE
   hash
   log
   uid2grp
+  netgroup_cache
   fsalpseudo
   )
 

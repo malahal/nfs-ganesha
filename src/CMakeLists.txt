@@ -938,6 +938,7 @@ set(GANESHA_CORE
   hash
   log
   uid2grp
+  ng_cache
   fsalpseudo
   )
 

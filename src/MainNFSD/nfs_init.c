@@ -61,6 +61,7 @@
 #include "sal_functions.h"
 #include "fridgethr.h"
 #include "idmapper.h"
+#include "ng_cache.h"
 #include "delayed_exec.h"
 #include "client_mgr.h"
 #include "export_mgr.h"
@@ -328,6 +329,8 @@ int init_server_pkgs(void)
 
 	/* init uid2grp cache */
 	uid2grp_cache_init();
+
+	ng_cache_init();	/* initialize netgroup cache */
 
 	/* Cache Inode Initialisation */
 	cache_status = cache_inode_init();

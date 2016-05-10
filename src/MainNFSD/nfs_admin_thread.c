@@ -39,6 +39,7 @@
 #include "sal_data.h"
 #include "cache_inode_lru.h"
 #include "idmapper.h"
+#include "ng_cache.h"
 #include "delayed_exec.h"
 #include "export_mgr.h"
 #include "fsal.h"
@@ -255,6 +256,7 @@ static bool admin_dbus_purge_gids(DBusMessageIter *args,
 	}
 
 	uid2grp_clear_cache();
+	ng_cache_purge();
 
  out:
 	dbus_status_reply(&iter, success, errormsg);

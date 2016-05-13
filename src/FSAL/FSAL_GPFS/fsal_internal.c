@@ -573,6 +573,9 @@ fsal_status_t fsal_internal_create(struct fsal_obj_handle *dir_hdl,
 	if (rc < 0) {
 		if (errsv == EUNATCH)
 			LogFatal(COMPONENT_FSAL, "GPFS Returned EUNATCH");
+		LogDebug(COMPONENT_FSAL,
+			 "GPFS Returned errno: %d while trying to create %s\n",
+			 errsv, p_stat_name);
 		return fsalstat(posix2fsal_error(errsv), errsv);
 	}
 

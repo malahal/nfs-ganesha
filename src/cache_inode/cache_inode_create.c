@@ -80,6 +80,7 @@ cache_inode_create(cache_entry_t *parent,
 	cache_inode_create_arg_t zero_create_arg;
 	bool needdec = false;
 
+	LogWarn(COMPONENT_CACHE_INODE, "cahe_inode_create(), name:%s", name);
 	memset(&zero_create_arg, 0, sizeof(zero_create_arg));
 	memset(&object_attributes, 0, sizeof(object_attributes));
 
@@ -168,6 +169,9 @@ cache_inode_create(cache_entry_t *parent,
 
 	/* Check for the result */
 	if (FSAL_IS_ERROR(fsal_status)) {
+		LogWarn(COMPONENT_CACHE_INODE,
+			 "FSAL returned STALE %d on create:%s, type %d",
+			 fsal_status.major, name, type);
 		if (fsal_status.major == ERR_FSAL_STALE) {
 			LogEvent(COMPONENT_CACHE_INODE,
 				 "FSAL returned STALE on create type %d", type);
@@ -178,9 +182,11 @@ cache_inode_create(cache_entry_t *parent,
 			    cache_inode_lookup(parent, name, entry);
 			if (*entry != NULL) {
 				status = CACHE_INODE_ENTRY_EXISTS;
-				LogFullDebug(COMPONENT_CACHE_INODE,
+				LogWarn(COMPONENT_CACHE_INODE,
 					     "create failed because it already exists");
 				if ((*entry)->type != type) {
+					LogWarn(COMPONENT_CACHE_INODE,
+					     "create failed incompatible");
 					/* Incompatible types, returns NULL */
 					cache_inode_put(*entry);
 					*entry = NULL;
@@ -198,8 +204,8 @@ cache_inode_create(cache_entry_t *parent,
 		}
 
 		status = cache_inode_error_convert(fsal_status);
-		LogFullDebug(COMPONENT_CACHE_INODE,
-			     "create failed because FSAL failed");
+		LogWarn(COMPONENT_CACHE_INODE,
+			     "create failed because FSAL failed, %d", status);
 		*entry = NULL;
 		goto out;
 	}
@@ -207,7 +213,7 @@ cache_inode_create(cache_entry_t *parent,
 	    cache_inode_new_entry(object_handle, CACHE_INODE_FLAG_CREATE,
 				  entry);
 	if (*entry == NULL) {
-		LogFullDebug(COMPONENT_CACHE_INODE,
+		LogWarn(COMPONENT_CACHE_INODE,
 			     "create failed because insert new entry failed");
 		goto out;
 	}
@@ -219,7 +225,7 @@ cache_inode_create(cache_entry_t *parent,
 	if (status != CACHE_INODE_SUCCESS) {
 		cache_inode_put(*entry);
 		*entry = NULL;
-		LogFullDebug(COMPONENT_CACHE_INODE,
+		LogWarn(COMPONENT_CACHE_INODE,
 			     "create failed because add dirent failed");
 		goto out;
 	}
@@ -235,7 +241,7 @@ cache_inode_create(cache_entry_t *parent,
 		/* decrease refcnt to allow negative cache lookup */
 		atomic_dec_uint32_t(&parent->icreate_refcnt);
 	}
-	LogFullDebug(COMPONENT_CACHE_INODE,
+	LogWarn(COMPONENT_CACHE_INODE,
 		     "Returning entry=%p status=%s for %s FSAL=%s", *entry,
 		     cache_inode_err_str(status), name,
 		     parent->obj_handle->fsal->name);

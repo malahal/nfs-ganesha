@@ -211,6 +211,8 @@ int nfs4_op_create(struct nfs_argop4 *op, compound_data_t *data,
 	case NF4DIR:
 
 		/* Create a new directory */
+		LogWarn(COMPONENT_CACHE_INODE, "calling cache_inode_create, "
+				"name=%s", name);
 		cache_status = cache_inode_create(entry_parent,
 						  name,
 						  DIRECTORY,

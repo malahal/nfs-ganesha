@@ -200,6 +200,39 @@ cache_inode_avl_insert_impl(cache_entry_t *entry,
 	return code;
 }
 
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <execinfo.h>
+
+extern __thread char thread_name[16];
+pthread_mutex_t trace_lock = PTHREAD_MUTEX_INITIALIZER;
+void
+print_trace(cache_inode_dir_entry_t *v, bool collision)
+{
+	void *array[20];
+	size_t size;
+	static int fd = -1;
+	char buf[100];
+
+	if (fd == -1)
+		fd = open("/tmp/malahal.backtrace",
+				O_RDWR | O_APPEND | O_CREAT, 0x700);
+	if (fd == -1) {
+		LogCrit(COMPONENT_STATE, "open failed, errno: %d\n", errno);
+		return;
+	}
+
+	pthread_mutex_lock(&trace_lock);
+	size = backtrace(array, 20);
+	backtrace_symbols_fd(array, size, fd);
+	snprintf(buf, sizeof(buf), "thread:%s, name: %s, collision:%d\n",
+			thread_name, v->name, collision);
+	write(fd, buf, strlen(buf));
+	pthread_mutex_unlock(&trace_lock);
+}
+
+
 #define MIN_COOKIE_VAL 3
 
 /*
@@ -222,6 +255,7 @@ cache_inode_avl_qp_insert(cache_entry_t *entry,
 #endif
 	int j, j2, code = -1;
 
+	print_trace(v, false);
 	/* don't permit illegal cookies */
 #if AVL_HASH_MURMUR3
 	MurmurHash3_x64_128(v->name, strlen(v->name), 67, hk);
@@ -257,6 +291,7 @@ cache_inode_avl_qp_insert(cache_entry_t *entry,
 						  CACHE_INODE_FLAG_ONLY_ACTIVE);
 			assert(v != v2);
 			if (v2 && (strcmp(v->name, v2->name) == 0)) {
+				print_trace(v, true);
 				LogCrit(COMPONENT_CACHE_INODE,
 					"cache_inode_avl_qp_insert_s: name conflict (%s, %s)",
 					v->name, v2->name);

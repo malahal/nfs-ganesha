@@ -297,11 +297,18 @@ cache_inode_add_cached_dirent(cache_entry_t *parent,
 	/* add to avl */
 	code = cache_inode_avl_qp_insert(parent, new_dir_entry);
 	if (code < 0) {
-		/* collision, tree not updated--release both pool objects and
-		 * return err */
+		/* collision, tree not updated--release both pool objects.
+		 *
+		 * A direntry for this name may have been already added
+		 * asynchronously due to an FSAL upcall. So return
+		 * success if code == -2. @todo, sane names for code values?
+		 */
 		gsh_free(new_dir_entry->ckey.kv.addr);
 		gsh_free(new_dir_entry);
-		status = CACHE_INODE_ENTRY_EXISTS;
+		if (code == -2)
+			status = CACHE_INODE_SUCCESS;
+		else
+			status = CACHE_INODE_INSERT_ERROR;
 		return status;
 	}
 

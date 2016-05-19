@@ -205,33 +205,26 @@ cache_inode_avl_insert_impl(cache_entry_t *entry,
 #include <fcntl.h>
 #include <execinfo.h>
 
-extern __thread char thread_name[16];
-pthread_mutex_t trace_lock = PTHREAD_MUTEX_INITIALIZER;
 void
 print_trace(cache_inode_dir_entry_t *v, bool collision)
 {
-	void *array[20];
+	void *array[30];
 	size_t size;
-	static int fd = -1;
-	char buf[100];
+	size_t i;
+	char buf[1500];
+	char **strings;
 
-	if (fd == -1)
-		fd = open("/tmp/malahal.backtrace",
-				O_RDWR | O_APPEND | O_CREAT, 0x700);
-	if (fd == -1) {
-		LogCrit(COMPONENT_STATE, "open failed, errno: %d\n", errno);
-		return;
+	size = backtrace(array, 30);
+	strings = backtrace_symbols(array, size);
+	buf[0] = '\0';
+	for (i = 0; i < size; i++) {
+		strcat(buf, strings[i]);
+		strcat(buf, "-->");
 	}
-
-	pthread_mutex_lock(&trace_lock);
-	size = backtrace(array, 20);
-	backtrace_symbols_fd(array, size, fd);
-	snprintf(buf, sizeof(buf), "thread:%s, name: %s, collision:%d\n",
-			thread_name, v->name, collision);
-	write(fd, buf, strlen(buf));
-	pthread_mutex_unlock(&trace_lock);
+	free(strings);
+	LogWarn(COMPONENT_STATE, "stack: %s, name: %s, collision:%d",
+			buf, v->name, collision);
 }
-
 
 #define MIN_COOKIE_VAL 3
 

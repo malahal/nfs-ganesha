@@ -141,6 +141,8 @@ cache_inode_remove(cache_entry_t *entry, const char *name)
 				"Error closing %s before unlink: %s.", name,
 				cache_inode_err_str(status));
 		}
+	} else {
+		LogCrit(COMPONENT_CACHE_INODE, "name: %s is not open", name);
 	}
 
 #ifdef ENABLE_RFC_ACL

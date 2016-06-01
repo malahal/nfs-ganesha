@@ -199,6 +199,7 @@ cache_inode_rename(cache_entry_t *dir_src,
 	cache_inode_status_t status_ref_dir_dst = CACHE_INODE_SUCCESS;
 	cache_inode_status_t status_ref_src = CACHE_INODE_SUCCESS;
 	cache_inode_status_t status_ref_dst = CACHE_INODE_SUCCESS;
+	cache_inode_status_t rc;
 
 	if ((dir_src->type != DIRECTORY) || (dir_dest->type != DIRECTORY)) {
 		status = CACHE_INODE_NOT_A_DIRECTORY;
@@ -353,6 +354,20 @@ cache_inode_rename(cache_entry_t *dir_src,
 	}
 
 	if (lookup_dst) {
+		/* Call cache_inode_close on the overwritten inode, will
+		 * be really closed only if the cache entry is not pinned.
+		 */
+		if (is_open(lookup_dst)) {
+			rc = cache_inode_close(lookup_dst,
+					       CACHE_INODE_FLAG_REALLYCLOSE);
+			if (rc != CACHE_INODE_SUCCESS) {
+				/* Log a warning and move on */
+				LogCrit(COMPONENT_CACHE_INODE,
+					"Error closing dest: %s after rename: %s.",
+					newname, cache_inode_err_str(status));
+			}
+		}
+
 		/* Force a refresh of the overwritten inode */
 		status_ref_dst = cache_inode_refresh_attrs_locked(lookup_dst);
 		if (status_ref_dst == CACHE_INODE_ESTALE)

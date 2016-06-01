@@ -3053,6 +3053,21 @@ state_status_t state_unlock(cache_entry_t *entry,
  out:
 
 	cache_inode_dec_pin_ref(entry, false);
+
+	/* Here is our chance to close this file as we unpinned the
+	 * entry. This avoids keeping us open deleted files.
+	 */
+	if (is_open(entry)) {
+		cache_status = cache_inode_close(entry,
+						 CACHE_INODE_FLAG_REALLYCLOSE);
+		if (cache_status != CACHE_INODE_SUCCESS) {
+			/* Log a warning and move on */
+			LogWarn(COMPONENT_CACHE_INODE,
+				"Error closing entry: %p after unlock: %s.",
+				entry, cache_inode_err_str(cache_status));
+		}
+	}
+
 	return status;
 }
 

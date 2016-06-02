@@ -2840,20 +2840,22 @@ state_status_t state_lock(cache_entry_t *entry,
 		status = STATE_LOCK_BLOCKED;
 
 	if (status == STATE_SUCCESS) {
-		/* Merge any touching or overlapping locks into this one */
-		LogEntry("FSAL lock acquired, merging locks for",
-			 found_entry);
-
-		merge_lock_entry(entry, found_entry);
-
-		/* Insert entry into lock list */
-		LogEntry("New lock", found_entry);
-
 		if (glist_empty(&entry->object.file.lock_list)) {
 			/* List was empty so we must retain the pin reference
 			 */
 			unpin = false;
+		} else {
+			/* Merge any touching or overlapping locks into this
+			 * one
+			 */
+			LogEntry("FSAL lock acquired, merging locks for",
+				 found_entry);
+
+			merge_lock_entry(entry, found_entry);
 		}
+
+		/* Insert entry into lock list */
+		LogEntry("New lock", found_entry);
 
 		glist_add_tail(&entry->object.file.lock_list,
 			       &found_entry->sle_list);

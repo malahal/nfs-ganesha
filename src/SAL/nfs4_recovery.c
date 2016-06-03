@@ -341,7 +341,14 @@ void nfs4_add_clid(nfs_client_id_t *clientid)
 		   "address incorrect: errno:%d %s", errno, strerror(errno));
 	  return;
 	}
-	snprintf(ip_path, sizeof(ip_path), "%s/%s/", NFS_V4_RECOV_ROOT, ipstr);
+
+	/* Make IPv4 address look like IPv6 */
+	if (op_ctx->server_addr->ss_family == AF_INET)
+		snprintf(ip_path, sizeof(ip_path),
+			 "%s/::ffff:%s/", NFS_V4_RECOV_ROOT, ipstr);
+	else
+		snprintf(ip_path, sizeof(ip_path),
+			 "%s/%s/", NFS_V4_RECOV_ROOT, ipstr);
 
 	/* Make sure IP-based recovery path exists ... this needs to be created
 	 * on the fly here because server IPs can change. */

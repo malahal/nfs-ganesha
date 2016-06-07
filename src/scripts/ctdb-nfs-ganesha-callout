@@ -31,7 +31,7 @@ usage ()
     cat <<EOF
 usage: $_c { shutdown | startup }
        $_c { stop | start | check } nfs
-       $_c { releaseip | takeip }
+       $_c { releaseip-pre | takeip-pre }
        $_c { monitor-list-shares }
 EOF
     exit 1
@@ -229,8 +229,8 @@ startup
 stop
 start
 check
-releaseip
-takeip
+releaseip-pre
+takeip-pre
 monitor-list-shares
 EOF
 }
@@ -246,11 +246,11 @@ case "$action" in
     stop)                service_stop "$1"       ;;
     start)               service_start "$1"      ;;
     check)               service_check "$1"      ;;
-    releaseip)           nfs_releaseip "$@"      ;;
-    takeip)              nfs_takeip "$@"         ;;
+    releaseip-pre)       nfs_releaseip "$@"      ;;
+    takeip-pre)          nfs_takeip "$@"         ;;
     monitor-list-shares) nfs_monitor_list_shares ;;
     register)		 nfs_register		 ;;
-    monitor-pre|monitor-post)
+    monitor-pre|monitor-post|takeip|releaseip)
         # Not required/implemented
         :
         ;;

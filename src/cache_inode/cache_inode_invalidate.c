@@ -73,6 +73,8 @@ cache_inode_invalidate(cache_entry_t *entry, uint32_t flags)
 {
 	cache_inode_status_t status = CACHE_INODE_SUCCESS;
 
+	LogWarn(COMPONENT_CACHE_INODE, "inode: %d, flgas: 0x%X\n",
+			entry->obj_handle->attrs->fileid, flags);
 	if (!(flags & CACHE_INODE_INVALIDATE_GOT_LOCK))
 		PTHREAD_RWLOCK_wrlock(&entry->attr_lock);
 

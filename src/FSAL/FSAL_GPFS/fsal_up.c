@@ -298,6 +298,7 @@ void *GPFSFSAL_UP_Thread(void *Arg)
 				 * changes, and we may end up with stale values
 				 * until this gets fixed!
 				 */
+				flags = 0xffff & flags;
 				if (flags & (UP_SIZE | UP_SIZE_BIG)) {
 					rc = event_func->invalidate(
 						gpfs_fs->fs->fsal, &key,

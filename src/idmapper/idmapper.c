@@ -686,7 +686,10 @@ bool principal2uid(char *principal, uid_t *uid, gid_t *gid)
 		   from gss creds */
 		rc = nfs4_gss_princ_to_ids("krb5", principal, &gss_uid,
 					   &gss_gid);
-		if (rc) {
+		LogWarn(COMPONENT_IDMAPPER,
+			"princ_to_ids returned rc:%d, uid:%d, gid:%d",
+			rc, gss_uid, gss_gid);
+		if (rc || gss_gid == ANON_GID) {
 #ifdef _MSPAC_SUPPORT
 			bool found_uid = false;
 			bool found_gid = false;

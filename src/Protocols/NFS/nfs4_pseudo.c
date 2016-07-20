@@ -300,6 +300,7 @@ bool pseudo_mount_export(struct gsh_export *export)
 	char *tok;
 	char *saveptr = NULL;
 	int rc;
+	int len;
 
 	/* skip exports that aren't for NFS v4
 	 * Also, nothing to actually do for Pseudo Root
@@ -318,6 +319,13 @@ bool pseudo_mount_export(struct gsh_export *export)
 	LogDebug(COMPONENT_EXPORT,
 		 "BUILDING PSEUDOFS: Export_Id %d Path %s Pseudo Path %s",
 		 export->export_id, export->fullpath, export->pseudopath);
+
+	/* pseudopath should not end in '/' unless it is root path */
+	len = strlen(export->pseudopath);
+	if (len > 1 && export->pseudopath[len-1] == '/') {
+		LogFatal(COMPONENT_EXPORT,
+		       "pseudopath %s ends in '/'", export->pseudopath);
+	}
 
 	/* Make a copy of the path */
 	tmp_pseudopath = alloca(strlen(export->pseudopath) + 1);

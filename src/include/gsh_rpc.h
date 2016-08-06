@@ -293,18 +293,15 @@ do {								\
 		if (!(rlocked && ((x)->xp_type == XPRT_UDP))) {	\
 			SVC_LOCK((x), XP_LOCK_SEND, __func__,	\
 				 __LINE__);			\
+			slocked = true;				\
 		}						\
-		slocked = true;					\
 	}							\
 } while (0)
 
 #define DISP_SUNLOCK2(x)						\
 do {									\
 	if (slocked) {							\
-		if (!(rlocked && ((x)->xp_type == XPRT_UDP))) {	\
-			SVC_UNLOCK((x), XP_LOCK_SEND, __func__,		\
-				   __LINE__);				\
-		}							\
+		SVC_UNLOCK((x), XP_LOCK_SEND, __func__,	__LINE__);	\
 		slocked = false;					\
 	}								\
 } while (0)

@@ -301,7 +301,7 @@ do {								\
 #define DISP_SUNLOCK2(x)						\
 do {									\
 	if (slocked) {							\
-		if (!(((x)->xp_type == XPRT_UDP) && !rlocked)) {	\
+		if (!(rlocked && ((x)->xp_type == XPRT_UDP))) {	\
 			SVC_UNLOCK((x), XP_LOCK_SEND, __func__,		\
 				   __LINE__);				\
 		}							\

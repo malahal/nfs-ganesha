@@ -1622,7 +1622,7 @@ static inline enum auth_stat AuthenticateRequest(nfs_request_t *reqnfs,
 			auth_stat2str(why));
 		DISP_SLOCK2(xprt);
 		svcerr_auth(xprt, &reqnfs->svc, why);
-		DISP_SUNLOCK(xprt);
+		DISP_SUNLOCK2(xprt);
 		*no_dispatch = true;
 		return why;
 	} else {
@@ -1762,9 +1762,9 @@ static bool is_rpc_call_valid(nfs_request_t *reqnfs)
 			     "Invalid protocol Version #%d for program number #%d",
 			     (int)reqnfs->svc.rq_vers,
 			     (int)reqnfs->svc.rq_prog);
-		DISP_SLOCK(reqnfs->xprt);
+		DISP_SLOCK2(reqnfs->xprt);
 		svcerr_progvers(reqnfs->xprt, &reqnfs->svc, lo_vers, hi_vers);
-		DISP_SUNLOCK(reqnfs->xprt);
+		DISP_SUNLOCK2(reqnfs->xprt);
 	}
 	return false;
 
@@ -1774,9 +1774,9 @@ static bool is_rpc_call_valid(nfs_request_t *reqnfs)
 		LogFullDebug(COMPONENT_DISPATCH,
 			     "Invalid protocol program number #%d",
 			     (int)reqnfs->svc.rq_prog);
-		DISP_SLOCK(reqnfs->xprt);
+		DISP_SLOCK2(reqnfs->xprt);
 		svcerr_noproc(reqnfs->xprt, &reqnfs->svc);
-		DISP_SUNLOCK(reqnfs->xprt);
+		DISP_SUNLOCK2(reqnfs->xprt);
 	}
 	return false;
 }				/* is_rpc_call_valid */
@@ -2153,7 +2153,7 @@ static int nfs_rpc_get_args(nfs_request_t *reqnfs)
 		/* XXX move this, removing need for thr_ctx */
 		DISP_SLOCK2(xprt);
 		svcerr_decode(xprt, &reqnfs->svc);
-		DISP_SUNLOCK(xprt);
+		DISP_SUNLOCK2(xprt);
 		return false;
 	}
 

@@ -367,6 +367,7 @@ int main(int argc, char *argv[])
 		char linebuf[1024];
 		struct flock lk;
 
+		LogEvent(COMPONENT_MAIN, "malahal fd=%d\n", pidfile);
 		/* Try to obtain a lock on the file */
 		lk.l_type = F_WRLCK;
 		lk.l_whence = SEEK_SET;

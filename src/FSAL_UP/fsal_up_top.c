@@ -137,6 +137,10 @@ static cache_inode_status_t update(struct fsal_module *fsal,
 	/* Have necessary changes been made? */
 	bool mutatis_mutandis = false;
 
+	LogFullDebug(COMPONENT_FSAL_UP,
+		     "attr mask: 0x%x, numlinks: %d, flags: 0x%x",
+		     attr->mask, attr->numlinks, flags);
+
 	/* These cannot be updated, changing any of them is
 	   tantamount to destroying and recreating the file. */
 	if (FSAL_TEST_MASK

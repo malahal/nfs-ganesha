@@ -36,6 +36,7 @@ struct ng_cache_info {
 	struct avltree_node ng_node;
 	struct gsh_buffdesc ng_group;
 	struct gsh_buffdesc ng_host;
+	time_t ng_epoch;
 };
 
 #define NG_CACHE_SIZE 1009
@@ -99,6 +100,20 @@ static int ng_comparator(const struct avltree_node *node1,
 	return rc;
 }
 
+static bool ng_expired(struct avltree_node *node)
+{
+	struct ng_cache_info *info;
+
+	info = avltree_container_of(node, struct ng_cache_info, ng_node);
+
+	/* Hardcoded to 30 minutes for now */
+	if (time(NULL) - info->ng_epoch > 30 * 60)
+		return true;
+
+	return false;
+}
+
+
 
 /**
  * @brief Initialize the netgroups cache
@@ -143,6 +158,7 @@ static void ng_add(const char *group, const char *host, bool negative)
 	info->ng_group.len = strlen(group)+1;
 	info->ng_host.addr = gsh_strdup(host);
 	info->ng_host.len = strlen(host)+1;
+	info->ng_epoch = time(NULL);
 
 	if (negative) {
 		/* @todo check positive cache first? */
@@ -151,8 +167,12 @@ static void ng_add(const char *group, const char *host, bool negative)
 		/* If an already existing entry is found, keep the old
 		 * entry, and free the current entry
 		 */
-		if (found_node)
+		if (found_node) {
+			found_info = avltree_container_of(found_node,
+					struct ng_cache_info, ng_node);
+			found_info->ng_epoch = info->ng_epoch;
 			ng_free(info);
+		}
 	} else {
 		/* @todo delete from negative cache if there? */
 		found_node = avltree_insert(&info->ng_node, &pos_ng_tree);
@@ -164,6 +184,7 @@ static void ng_add(const char *group, const char *host, bool negative)
 			found_info = avltree_container_of(found_node,
 					struct ng_cache_info, ng_node);
 			ng_cache[ng_hash_key(info)] = found_node;
+			found_info->ng_epoch = info->ng_epoch;
 			ng_free(info);
 		} else {
 			ng_cache[ng_hash_key(info)] = &info->ng_node;
@@ -186,19 +207,31 @@ static bool ng_lookup(const char *group, const char *host, bool negative)
 
 	if (negative) {
 		node = avltree_lookup(&prototype.ng_node, &neg_ng_tree);
-		return (node) ? true : false;
+		if (!node)
+			return false;
+
+		if (!ng_expired(node))
+			return true;
+
+		goto expired;
 	}
 
 	/* Positive lookups are stored in the cache */
 	cache_slot = (void **)&ng_cache[ng_hash_key(&prototype)];
 	node = atomic_fetch_voidptr(cache_slot);
-	if (node && ng_comparator(node, &prototype.ng_node) == 0)
-		return true;
+	if (node && ng_comparator(node, &prototype.ng_node) == 0) {
+		if (!ng_expired(node))
+			return true;
+		goto expired;
+	}
 
 	/* cache miss, search AVL tree */
 	node = avltree_lookup(&prototype.ng_node, &pos_ng_tree);
 	if (!node)
 		return false;
+
+	if (ng_expired(node))
+		goto expired;
 
 	info = avltree_container_of(node, struct ng_cache_info, ng_node);
 
@@ -206,6 +239,16 @@ static bool ng_lookup(const char *group, const char *host, bool negative)
 	atomic_store_voidptr(cache_slot, node);
 
 	return true;
+
+expired:
+	/* entry expired, acquire write mode lock for removal */
+	PTHREAD_RWLOCK_unlock(&ng_lock);
+	PTHREAD_RWLOCK_wrlock(&ng_lock);
+	info = avltree_container_of(node, struct ng_cache_info, ng_node);
+	ng_remove(info, negative);
+	ng_free(info);
+	PTHREAD_RWLOCK_rdlock(&ng_lock);
+	return false;
 }
 
 /**

@@ -1090,6 +1090,7 @@ void dec_nlm_client_ref(state_nlm_client_t *client)
 	struct gsh_buffdesc old_value;
 	struct gsh_buffdesc old_key;
 	int32_t refcount;
+	static bool wait = true;
 
 	if (isDebug(COMPONENT_STATE)) {
 		display_nlm_client(&dspbuf, client);
@@ -1109,6 +1110,19 @@ void dec_nlm_client_ref(state_nlm_client_t *client)
 
 	if (str_valid)
 		LogFullDebug(COMPONENT_STATE, "Try to remove {%s}", str);
+
+	/* Test injection: let some other thread pass us!
+	 *
+	 * The way the hash tables are used here, wec an't access client
+	 * structure as soon as the refcount goes to zero. One option to copy
+	 * enough data for the hash table before we decrement the refcount
+	 */
+	if (wait) {
+		wait = false;
+		sleep(10);
+	} else {
+		wait = true;
+	}
 
 	buffkey.addr = client;
 	buffkey.len = sizeof(*client);

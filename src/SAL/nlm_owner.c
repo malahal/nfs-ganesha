@@ -1084,11 +1084,6 @@ void dec_nlm_client_ref(state_nlm_client_t *client)
 	char str[LOG_BUFF_LEN];
 	struct display_buffer dspbuf = {sizeof(str), str, str};
 	bool str_valid = false;
-	struct hash_latch latch;
-	hash_error_t rc;
-	struct gsh_buffdesc buffkey;
-	struct gsh_buffdesc old_value;
-	struct gsh_buffdesc old_key;
 	int32_t refcount;
 
 	if (isDebug(COMPONENT_STATE)) {
@@ -1108,52 +1103,9 @@ void dec_nlm_client_ref(state_nlm_client_t *client)
 	}
 
 	if (str_valid)
-		LogFullDebug(COMPONENT_STATE, "Try to remove {%s}", str);
-
-	buffkey.addr = client;
-	buffkey.len = sizeof(*client);
-
-	/* Get the hash table entry and hold latch */
-	rc = hashtable_getlatch(ht_nlm_client, &buffkey, &old_value, true,
-				&latch);
-
-	if (rc != HASHTABLE_SUCCESS) {
-		if (rc == HASHTABLE_ERROR_NO_SUCH_KEY)
-			hashtable_releaselatched(ht_nlm_client, &latch);
-
-		if (!str_valid)
-			display_nlm_client(&dspbuf, client);
-
-		LogCrit(COMPONENT_STATE, "Error %s, could not find {%s}",
-			hash_table_err_to_str(rc), str);
-
-		return;
-	}
-
-	refcount = atomic_fetch_int32_t(&client->slc_refcount);
-
-	if (refcount > 0) {
-		if (str_valid)
-			LogDebug(COMPONENT_STATE,
-				 "Did not release refcount now=%"PRId32" {%s}",
-				 refcount, str);
-
-		hashtable_releaselatched(ht_nlm_client, &latch);
-
-		return;
-	}
-
-	/* use the key to delete the entry */
-	hashtable_deletelatched(ht_nlm_client, &buffkey, &latch, &old_key,
-				&old_value);
-
-	/* Release the latch */
-	hashtable_releaselatched(ht_nlm_client, &latch);
-
-	if (str_valid)
 		LogFullDebug(COMPONENT_STATE, "Free {%s}", str);
 
-	free_nlm_client(old_value.addr);
+	free_nlm_client(client);
 }
 
 /**
@@ -1299,6 +1251,11 @@ state_nlm_client_t *get_nlm_client(care_t care, SVCXPRT *xprt,
 	buffval.addr = pclient;
 	buffval.len = sizeof(*pclient);
 
+	/* Increment a refcount for being in the hash table for the reaper
+	 * thread. Ideally hashtable_setlatched should be doing the extra
+	 * reference when we move every hash table to this method.
+	 */
+	inc_nlm_client_ref(pclient);
 	rc = hashtable_setlatched(ht_nlm_client, &buffval, &buffval, &latch,
 				  false, NULL, NULL);
 

@@ -149,6 +149,8 @@ state_nsm_client_t *get_nsm_client(care_t care, SVCXPRT *xprt,
 				   char *caller_name);
 void inc_nlm_client_ref(state_nlm_client_t *client);
 void dec_nlm_client_ref(state_nlm_client_t *client);
+int display_nlm_client(struct display_buffer *dspbuf,
+		       state_nlm_client_t *client);
 int display_nlm_client_val(struct gsh_buffdesc *buff, char *str);
 int display_nlm_client_key(struct gsh_buffdesc *buff, char *str);
 

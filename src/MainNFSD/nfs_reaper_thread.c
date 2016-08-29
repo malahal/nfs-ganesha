@@ -41,6 +41,64 @@ unsigned int reaper_delay = REAPER_DELAY;
 
 static struct fridgethr *reaper_fridge;
 
+static int reap_nlm_client(hash_table_t *ht)
+{
+	struct rbt_head *head_rbt;
+	struct hash_data *addr;
+	state_nlm_client_t *client;
+	struct rbt_node *pn;
+	struct gsh_buffdesc buffkey;
+	struct gsh_buffdesc old_value;
+	struct gsh_buffdesc old_key;
+	char str[LOG_BUFF_LEN];
+	struct display_buffer dspbuf = {sizeof(str), str, str};
+	int i;
+	int rc;
+	int count = 0;
+
+	/* For each bucket of the requested hashtable */
+	for (i = 0; i < ht->parameter.index_size; i++) {
+		head_rbt = &ht->partitions[i].rbt;
+
+		PTHREAD_RWLOCK_wrlock(&ht->partitions[i].lock);
+
+		RBT_LOOP(head_rbt, pn) {
+			addr = RBT_OPAQ(pn);
+			client = addr->val.addr;
+
+			/* Skip it if someone else is possiby using it */
+			if (client->slc_refcount != 1) {
+				RBT_INCREMENT(pn);
+				continue;
+			}
+
+			if (isDebug(COMPONENT_NLM)) {
+				display_nlm_client(&dspbuf, client);
+				LogFullDebug(COMPONENT_STATE,
+					     "Delete from HT {%s}", str);
+			}
+
+			count++;
+			buffkey.addr = client;
+			buffkey.len = sizeof(*client);
+			rc = HashTable_Del(ht, &buffkey, &old_key, &old_value);
+			if (rc != HASHTABLE_SUCCESS) {
+				LogCrit(COMPONENT_NLM,
+					"Could not remove nlm client %s error=%s",
+					str, hash_table_err_to_str(rc));
+				RBT_INCREMENT(pn);
+				continue;
+			}
+
+			dec_nlm_client_ref(client);
+		}
+
+		PTHREAD_RWLOCK_unlock(&ht->partitions[i].lock);
+	}
+
+	return count;
+}
+
 static int reap_expired_open_owners(hash_table_t *ht_reap)
 {
 	struct rbt_head *head_rbt;
@@ -269,6 +327,7 @@ static void reaper_run(struct fridgethr_context *ctx)
 	     reap_hash_table(ht_unconfirmed_client_id));
 
 	rst->count += reap_expired_open_owners(ht_nfs4_owner);
+	rst->count += reap_nlm_client(ht_nlm_client);
 }
 
 int reaper_init(void)

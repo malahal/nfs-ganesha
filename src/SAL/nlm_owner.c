@@ -1122,23 +1122,11 @@ void dec_nlm_client_ref(state_nlm_client_t *client)
 			hashtable_releaselatched(ht_nlm_client, &latch);
 
 		if (!str_valid)
-			display_nlm_client(&dspbuf, client);
+			display_printf(&dspbuf, "Invalid nlm client %p",
+				       client);
 
 		LogCrit(COMPONENT_STATE, "Error %s, could not find {%s}",
 			hash_table_err_to_str(rc), str);
-
-		return;
-	}
-
-	refcount = atomic_fetch_int32_t(&client->slc_refcount);
-
-	if (refcount > 0) {
-		if (str_valid)
-			LogDebug(COMPONENT_STATE,
-				 "Did not release refcount now=%"PRId32" {%s}",
-				 refcount, str);
-
-		hashtable_releaselatched(ht_nlm_client, &latch);
 
 		return;
 	}
@@ -1212,11 +1200,14 @@ state_nlm_client_t *get_nlm_client(care_t care, SVCXPRT *xprt,
 	buffkey.addr = &key;
 	buffkey.len = sizeof(key);
 
+again:
 	rc = hashtable_getlatch(ht_nlm_client, &buffkey, &buffval, true,
 				&latch);
 
-	/* If we found it, return it */
+	/* If we found it, return it if possible */
 	if (rc == HASHTABLE_SUCCESS) {
+		int32_t refcount;
+
 		pclient = buffval.addr;
 
 		/* Return the found NLM Client */
@@ -1225,11 +1216,67 @@ state_nlm_client_t *get_nlm_client(care_t care, SVCXPRT *xprt,
 			LogFullDebug(COMPONENT_STATE, "Found {%s}", str);
 		}
 
-		/* Increment refcount under hash latch.
-		 * This prevents dec ref from removing this entry from hash
-		 * if a race occurs.
+		/* Increment refcount under hash latch.  This prevents
+		 * against a race dec ref removing the final
+		 * reference. If we have that race however, we defer to
+		 * the other thread and pretend we didn't find the
+		 * entry.
 		 */
-		inc_nlm_client_ref(pclient);
+		refcount = atomic_inc_int32_t(&pclient->slc_refcount);
+
+		if (refcount == 1) {
+			/* This entry is in the process of being freed.
+			 * If care is not CARE_NOT, we will go back and
+			 * retry, otherwise we will return NULL.
+			 *
+			 * If we care, the retry may cycle a time or two
+			 * until the old entry manages to get out of the
+			 * table, and then if multiple get_nlm_client
+			 * calls are racing, one of them will get the
+			 * latch, not find the entry, and create it, the
+			 * rest will then in turn find that new entry.
+			 */
+			if (isDebug(COMPONENT_STATE)) {
+				display_nlm_client(&dspbuf, pclient);
+				LogDebug(COMPONENT_STATE,
+					 "Found entry is in the process of deconstruction, will %s {%s}",
+					 care == CARE_NOT
+						? "return NULL (CARE_NOT)"
+						: "retry",
+					 str);
+			}
+
+			/* Drop the reference we just got. */
+			refcount = atomic_dec_int32_t(&pclient->slc_refcount);
+
+			/* Just for kicks, validate the refcount */
+			if (refcount != 0) {
+				display_nlm_client(&dspbuf, pclient);
+				LogCrit(COMPONENT_STATE,
+					"Deconstructed entry has gained a reference {%s}",
+					str);
+			}
+
+			/* Now drop the hash table latch and try again or exit.
+			 */
+			hashtable_releaselatched(ht_nlm_client, &latch);
+
+			/* If we don't care, return NULL at this point,
+			 * otherwise retry.
+			 */
+			/** @todo should we nanosleep before retry? */
+			if (care == CARE_NOT)
+				return NULL;
+			else
+				goto again;
+		}
+
+		if (isFullDebug(COMPONENT_STATE)) {
+			display_nlm_client(&dspbuf, pclient);
+			LogFullDebug(COMPONENT_STATE,
+				     "Found {%s} refcount now=%" PRId32,
+				     str, refcount);
+		}
 
 		hashtable_releaselatched(ht_nlm_client, &latch);
 

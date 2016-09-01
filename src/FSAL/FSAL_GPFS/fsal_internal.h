@@ -84,11 +84,6 @@ typedef struct fsal_xstat__ {
 	char buffacl[GPFS_ACL_BUF_SIZE];
 } gpfsfsal_xstat_t;
 
-static inline size_t gpfs_sizeof_handle(const struct gpfs_file_handle *hdl)
-{
-	return hdl->handle_size;
-}
-
 void export_ops_init(struct export_ops *ops);
 void handle_ops_init(struct fsal_obj_ops *ops);
 void pnfs_ds_ops_init(struct fsal_pnfs_ds_ops *ops);

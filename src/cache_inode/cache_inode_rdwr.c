@@ -106,18 +106,10 @@ cache_inode_status_t cache_inode_rdwr(cache_entry_t *entry,
 	} else {
 		struct export_perms *perms;
 
-		/* Pretent that the caller requested sync (stable write)
-		 * if the export has COMMIT option. Note that
-		 * FSAL_O_SYNC is not always honored, so just setting
-		 * FSAL_O_SYNC has no guaranty that this write will be
-		 * a stable write.
-		 */
 		perms = &op_ctx->export->export_perms;
 		if (perms->options & EXPORT_OPTION_COMMIT)
 			*sync = true;
 		openflags = FSAL_O_WRITE;
-		if (*sync)
-			openflags |= FSAL_O_SYNC;
 	}
 
 	assert(obj_hdl != NULL);
@@ -184,8 +176,7 @@ cache_inode_status_t cache_inode_rdwr(cache_entry_t *entry,
 		   supposed to be a stable write we can sync to the hard
 		   drive. */
 
-		if (*sync && !(obj_hdl->obj_ops.status(obj_hdl) & FSAL_O_SYNC)
-		    && !fsal_sync && !FSAL_IS_ERROR(fsal_status)) {
+		if (*sync && !fsal_sync && !FSAL_IS_ERROR(fsal_status)) {
 			fsal_status = obj_hdl->obj_ops.commit(obj_hdl,
 							   offset, io_size);
 		} else {

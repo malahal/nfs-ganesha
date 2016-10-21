@@ -1138,8 +1138,6 @@ static fsal_status_t file_write(struct fsal_obj_handle *obj_hdl,
 	}
 
 	*write_amount = rc;
-	if (objhandle->openflags & FSAL_O_SYNC)
-		*fsal_stable = true;
 
  out:
 #ifdef GLTIMING

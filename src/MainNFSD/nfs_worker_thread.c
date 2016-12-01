@@ -819,6 +819,12 @@ void nfs_rpc_execute(request_data_t *reqdata)
 				     xprt->xp_fd);
 
 			DISP_SLOCK(xprt);
+			/* Sachin - do not respond back for create requests */
+			if (reqdata->r_u.req.svc.rq_proc == NFSPROC3_CREATE) {
+			    LogCrit(COMPONENT_DISPATCH,"Not sending reply for create");
+			    /* svcerr_systemerr(xprt, &reqdata->r_u.req.svc); */
+			    break;
+			}
 			if (!svc_sendreply(xprt, &reqdata->r_u.req.svc,
 					   reqdesc->xdr_encode_func,
 					   (caddr_t) res_nfs)) {
@@ -1330,13 +1336,22 @@ void nfs_rpc_execute(request_data_t *reqdata)
 		}
 		goto freeargs;
 	} else {
+		/* int drop = !(rand() % 10); */
 		LogFullDebug(COMPONENT_DISPATCH,
 			     "Before svc_sendreply on socket %d", xprt->xp_fd);
 
 		DISP_SLOCK(xprt);
 
+
+                /* Sachin - do not respond back for create requests */
+                if (reqdata->r_u.req.svc.rq_proc == NFSPROC3_CREATE) {
+                    LogCrit(COMPONENT_DISPATCH,"Not sending reply for create -initial ");
+		    /* if (xprt->xp_type != XPRT_UDP)
+			svc_destroy(xprt); */
+		    goto freeargs;
+		}
 		/* encoding the result on xdr output */
-		if (!svc_sendreply(xprt, &reqdata->r_u.req.svc,
+		if (/*!drop &&*/ !svc_sendreply(xprt, &reqdata->r_u.req.svc,
 				   reqdesc->xdr_encode_func,
 				   (caddr_t) res_nfs)) {
 			LogDebug(COMPONENT_DISPATCH,

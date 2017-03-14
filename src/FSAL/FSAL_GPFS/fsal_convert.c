@@ -34,7 +34,8 @@ gpfs_acl_2_fsal_acl(struct attrlist *p_object_attributes,
  */
 fsal_status_t
 gpfsfsal_xstat_2_fsal_attributes(gpfsfsal_xstat_t *gpfs_buf,
-				 struct attrlist *fsal_attr, bool use_acl)
+				 struct attrlist *fsal_attr,
+				 gpfs_acl_t *acl_buf, bool use_acl)
 {
 	struct stat *p_buffstat;
 
@@ -88,8 +89,8 @@ gpfsfsal_xstat_2_fsal_attributes(gpfsfsal_xstat_t *gpfs_buf,
 
 		if (use_acl && gpfs_buf->attr_valid & XATTR_ACL) {
 			/* ACL is valid, so try to convert fsal acl. */
-			fsal_status_t status = gpfs_acl_2_fsal_acl(
-				fsal_attr, (gpfs_acl_t *) gpfs_buf->buffacl);
+			fsal_status_t status = gpfs_acl_2_fsal_acl(fsal_attr,
+								   acl_buf);
 			if (!FSAL_IS_ERROR(status)) {
 				/* Only mark ACL valid if we actually provide
 				 * one in fsal_attr.

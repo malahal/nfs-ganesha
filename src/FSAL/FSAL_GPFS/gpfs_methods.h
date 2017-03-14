@@ -1,6 +1,9 @@
 /* GPFS methods for handles
  */
 
+#ifndef GPFS_METHODS_H
+#define GPFS_METHODS_H
+
 #include <fcntl.h>
 #include "include/gpfs_nfs.h"
 
@@ -173,4 +176,4 @@ gpfs_create_export(struct fsal_module *fsal_hdl, void *parse_node,
 struct state_t *gpfs_alloc_state(struct fsal_export *exp_hdl,
 				 enum state_type state_type,
 				 struct state_t *related_state);
-
+#endif

@@ -116,6 +116,10 @@ GPFSFSAL_getattrs(struct fsal_export *export, struct gpfs_filesystem *gpfs_fs,
 	bool expire;
 	uint32_t expire_time_attr = 0;	/*< Expiration time for attributes. */
 	struct gpfs_fsal_export *gpfs_export;
+	gpfs_acl_t *acl_buf;
+	unsigned int acl_buflen;
+	bool use_acl;
+	int retry;
 
 	/* Initialize fsal_fsid to 0.0 in case older GPFS */
 	buffxstat.fsal_fsid.major = 0;
@@ -125,16 +129,45 @@ GPFSFSAL_getattrs(struct fsal_export *export, struct gpfs_filesystem *gpfs_fs,
 		&op_ctx->ctx_export->expire_time_attr) > 0;
 
 	gpfs_export = container_of(export, struct gpfs_fsal_export, export);
-	st = fsal_get_xstat_by_handle(gpfs_fs->root_fd, gpfs_fh,
-				      &buffxstat, &expire_time_attr, expire,
-				      (obj_attr->request_mask & ATTR_ACL) != 0);
-	if (FSAL_IS_ERROR(st)) {
-		if (obj_attr->request_mask & ATTR_RDATTR_ERR) {
-			/* Caller asked for error to be visible. */
-			obj_attr->valid_mask = ATTR_RDATTR_ERR;
+
+	/* Let us make the first request using the acl buffer that
+	 * is part of buffxstat itself. If that is not sufficient,
+	 * we allocate from heap and retry.
+	 */
+	use_acl = obj_attr->request_mask & ATTR_ACL;
+	for (retry = 0; retry < GPFS_ACL_MAX_RETRY; retry++) {
+		switch (retry) {
+		case 0: /* first attempt */
+			acl_buf = (gpfs_acl_t *)buffxstat.buffacl;
+			acl_buflen = GPFS_ACL_BUF_SIZE;
+			break;
+		case 1: /* first retry, don't free the old stack buffer */
+			acl_buflen = acl_buf->acl_len;
+			acl_buf = gsh_malloc(acl_buflen);
+			break;
+		default: /* second or later retry, free the old heap buffer */
+			acl_buflen = acl_buf->acl_len;
+			gsh_free(acl_buf);
+			acl_buf = gsh_malloc(acl_buflen);
+			break;
 		}
-		return st;
+
+		st = fsal_get_xstat_by_handle(gpfs_fs->root_fd, gpfs_fh,
+				&buffxstat, acl_buf, acl_buflen,
+				&expire_time_attr, expire, use_acl);
+
+		if (FSAL_IS_ERROR(st) || !use_acl ||
+				acl_buflen >= acl_buf->acl_len)
+			break;
 	}
+
+	if (retry == GPFS_ACL_MAX_RETRY) { /* make up an error */
+		LogCrit(COMPONENT_FSAL, "unable to get ACLs");
+		st = fsalstat(ERR_FSAL_SERVERFAULT, 0);
+	}
+
+	if (FSAL_IS_ERROR(st))
+		goto error;
 
 	/* convert attributes */
 	if (expire_time_attr != 0)
@@ -146,17 +179,24 @@ GPFSFSAL_getattrs(struct fsal_export *export, struct gpfs_filesystem *gpfs_fs,
 	if (buffxstat.fsal_fsid.major == 0 && buffxstat.fsal_fsid.minor == 0)
 		buffxstat.fsal_fsid = gpfs_fs->fs->fsid;
 
-	st = gpfsfsal_xstat_2_fsal_attributes(&buffxstat, obj_attr,
+	st = gpfsfsal_xstat_2_fsal_attributes(&buffxstat, obj_attr, acl_buf,
 					      gpfs_export->use_acl);
+
+error:
 	if (FSAL_IS_ERROR(st)) {
 		if (obj_attr->request_mask & ATTR_RDATTR_ERR) {
 			/* Caller asked for error to be visible. */
 			obj_attr->valid_mask = ATTR_RDATTR_ERR;
 		}
-		return st;
 	}
 
-	return fsalstat(ERR_FSAL_NO_ERROR, 0);
+	/* Free acl buffer if we allocated on heap */
+	if (acl_buflen != GPFS_ACL_BUF_SIZE) {
+		assert(acl_buf != (gpfs_acl_t *)buffxstat.buffacl);
+		gsh_free(acl_buf);
+	}
+
+	return st;
 }
 
 /**

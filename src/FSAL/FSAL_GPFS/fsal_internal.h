@@ -30,6 +30,8 @@
  * @brief   Extern definitions for variables that are
  *          defined in fsal_internal.c.
  */
+#ifndef FSAL_INTERNAL_H
+#define FSAL_INTERNAL_H
 
 #include <sys/stat.h>
 #include "fsal.h"
@@ -37,6 +39,7 @@
 #include "fsal_types.h"
 #include "fcntl.h"
 #include "include/gpfs_nfs.h"
+#include "include/gpfs.h"
 #include "fsal_up.h"
 #include "gsh_config.h"
 
@@ -83,6 +86,7 @@ struct gpfs_fd {
 
 /* Define the buffer size for GPFS NFS4 ACL. */
 #define GPFS_ACL_BUF_SIZE 0x1000
+#define GPFS_ACL_MAX_RETRY 10
 
 /* Define the standard fsid_type for GPFS*/
 #define GPFS_FSID_TYPE FSID_MAJOR_64
@@ -115,10 +119,8 @@ fsal_status_t fsal_internal_get_handle_at(int dfd,
 				struct gpfs_file_handle *p_handle,
 				int expfd, int *expfdP);
 
-fsal_status_t gpfsfsal_xstat_2_fsal_attributes(
-					gpfsfsal_xstat_t *p_buffxstat,
-					struct attrlist *p_fsalattr_out,
-					bool use_acl);
+fsal_status_t gpfsfsal_xstat_2_fsal_attributes(gpfsfsal_xstat_t *gpfs_buf,
+		struct attrlist *fsal_attr, gpfs_acl_t *acl_buf, bool use_acl);
 
 /**
  * Gets a fd from a handle
@@ -187,6 +189,8 @@ fsal_status_t fsal_internal_rename_fh(int dirfd,
 fsal_status_t fsal_get_xstat_by_handle(int dirfd,
 				       struct gpfs_file_handle *p_handle,
 				       gpfsfsal_xstat_t *p_buffxstat,
+				       gpfs_acl_t *acl_buf,
+				       unsigned int acl_buflen,
 				       uint32_t *expire_time_attr,
 				       bool expire, bool use_acl);
 
@@ -335,3 +339,4 @@ size_t fs_da_addr_size(struct fsal_module *fsal_hdl);
 nfsstat4 getdeviceinfo(struct fsal_module *fsal_hdl,
 		       XDR *da_addr_body, const layouttype4 type,
 		       const struct pnfs_deviceid *deviceid);
+#endif

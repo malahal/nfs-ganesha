@@ -63,13 +63,6 @@ fsal_status_t mem_create_handle(struct fsal_export *exp_hdl,
 				  struct fsal_obj_handle **handle,
 				  struct attrlist *attrs_out);
 
-struct mem_fd {
-	/** The open and share mode etc. */
-	fsal_openflags_t openflags;
-	/** Current file offset location */
-	off_t offset;
-};
-
 /*
  * MEM internal object handle
  */
@@ -79,18 +72,19 @@ struct mem_fd {
 struct mem_fsal_obj_handle {
 	struct fsal_obj_handle obj_handle;
 	struct attrlist attrs;
+	uint64_t inode;
 	char handle[V4_FH_OPAQUE_SIZE];
-	struct mem_fsal_obj_handle *parent;
 	union {
 		struct {
+			struct mem_fsal_obj_handle *parent;
 			struct avltree avl_name;
 			struct avltree avl_index;
-			uint32_t numlinks;
+			uint32_t numkids;
+			uint32_t next_i; /* next child index */
 		} mh_dir;
 		struct {
 			struct fsal_share share;
-			struct mem_fd fd;
-			off_t length;
+			struct fsal_fd fd;
 		} mh_file;
 		struct {
 			object_file_type_t nodetype;
@@ -100,15 +94,25 @@ struct mem_fsal_obj_handle {
 			char *link_contents;
 		} mh_symlink;
 	};
-	struct avltree_node avl_n;
-	struct avltree_node avl_i;
+	struct glist_head dirents; /* List of dirents pointing to obj */
 	struct glist_head mfo_exp_entry;
-	uint32_t index; /* index in parent */
-	uint32_t next_i; /* next child index */
-	char *m_name;
-	bool inavl;
+	char *m_name;	/**< Base name of obj, for debugging */
 	uint32_t datasize;
+	bool is_export;
 	char data[0]; /* Allocated data */
+};
+
+/**
+ * @brief Dirent for FSAL_MEM
+ */
+struct mem_dirent {
+	struct mem_fsal_obj_handle *hdl; /**< Handle dirent points to */
+	struct mem_fsal_obj_handle *dir; /**< Dir containing dirent */
+	const char *d_name;		 /**< Name of dirent */
+	uint32_t d_index;		 /**< index in dir */
+	struct avltree_node avl_n;	 /**< Entry in dir's avl_name tree */
+	struct avltree_node avl_i;	 /**< Entry in dir's avl_index tree */
+	struct glist_head dlist;	 /**< Entry in hdl's dirents list */
 };
 
 static inline bool mem_unopenable_type(object_file_type_t type)
@@ -142,7 +146,7 @@ static inline void _mem_free_handle(struct mem_fsal_obj_handle *hdl,
 				    const char *func, int line)
 {
 #ifdef USE_LTTNG
-	tracepoint(fsalmem, mem_free, func, line, hdl);
+	tracepoint(fsalmem, mem_free, func, line, hdl, hdl->m_name);
 #endif
 
 	glist_del(&hdl->mfo_exp_entry);
@@ -171,6 +175,8 @@ struct mem_fsal_module {
 	uint32_t inode_size;
 	/** Config - Interval for UP call thread */
 	uint32_t up_interval;
+	/** Next unused inode */
+	uint64_t next_inode;
 };
 
 

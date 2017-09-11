@@ -753,6 +753,10 @@ bool nfs4_State_Del(state_t *state)
 
 	/* Delete the stateid hashed by entry/owner.
 	 * Use the old_value from above as the key.
+	 *
+	 * This state might have been overwritten in the ht_state_obj
+	 * hash table with another one, so we always return success from
+	 * here on to make sure that this state gets properly cleaned up.
 	 */
 	buffkey.addr = old_value.addr;
 	buffkey.len = old_value.len;
@@ -760,23 +764,27 @@ bool nfs4_State_Del(state_t *state)
 	/* Get latch: we need to check we're deleting the right state */
 	err = hashtable_getlatch(ht_state_obj, &buffkey, &old_value, true,
 				 &latch);
-	if (err != HASHTABLE_SUCCESS) {
-		if (err == HASHTABLE_ERROR_NO_SUCH_KEY)
-			hashtable_releaselatched(ht_state_obj, &latch);
 
-		LogCrit(COMPONENT_STATE, "hashtable get latch failed: %d",
-			err);
-		return false;
-	}
-
-	if (old_value.addr != state) {
-		/* state obj had already been swapped out */
+	switch (err) {
+	case HASHTABLE_SUCCESS:
+		if (old_value.addr == state) { /* our own */
+			hashtable_deletelatched(ht_state_obj, &buffkey,
+						&latch, NULL, NULL);
+		} else { /* state obj had already been swapped out */
+			LogDebug(COMPONENT_STATE,
+				 "state overwritten with another state");
+		}
 		hashtable_releaselatched(ht_state_obj, &latch);
-		return false;
+		break;
+
+	case HASHTABLE_ERROR_NO_SUCH_KEY:
+		hashtable_releaselatched(ht_state_obj, &latch);
+		/* FALLTHRU */
+	default:
+		LogCrit(COMPONENT_STATE, "hashtable get latch failed: %d", err);
+		break;
 	}
 
-	hashtable_deletelatched(ht_state_obj, &buffkey, &latch, NULL, NULL);
-	hashtable_releaselatched(ht_state_obj, &latch);
 	return true;
 }
 

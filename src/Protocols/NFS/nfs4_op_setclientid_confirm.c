@@ -82,6 +82,10 @@ int nfs4_op_setclientid_confirm(struct nfs_argop4 *op, compound_data_t *data,
 		sizeof(str_clientid4), str_clientid4, str_clientid4};
 	int rc;
 
+	extern pthread_barrier_t clientid_confirm_barr;
+
+	pthread_barrier_wait(&clientid_confirm_barr);
+
 	/* Make sure str_client is always printable even
 	 * if log level changes midstream.
 	 */

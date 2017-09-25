@@ -970,11 +970,14 @@ void nfs_start(nfs_start_info_t *p_start_info)
 	/* let main return 0 to exit */
 }
 
+pthread_barrier_t clientid_confirm_barr;
+
 void nfs_init_init(void)
 {
 	PTHREAD_MUTEX_init(&nfs_init.init_mutex, NULL);
 	PTHREAD_COND_init(&nfs_init.init_cond, NULL);
 	nfs_init.init_complete = false;
+	pthread_barrier_init(&clientid_confirm_barr, 0, 4);
 }
 
 void nfs_init_complete(void)

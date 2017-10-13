@@ -1180,7 +1180,7 @@ static u_int nfs_rpc_recv_user_data(SVCXPRT *xprt, SVCXPRT *newxprt,
 static void nfs_rpc_free_user_data(SVCXPRT *xprt)
 {
 	if (xprt->xp_u2) {
-		nfs_dupreq_put_drc(xprt, xprt->xp_u2, DRC_FLAG_RELEASE);
+		nfs_dupreq_put_drc(xprt->xp_u2, DRC_FLAG_RELEASE);
 		xprt->xp_u2 = NULL;
 	}
 	free_gsh_xprt_private(xprt);

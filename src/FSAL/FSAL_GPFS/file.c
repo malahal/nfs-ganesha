@@ -683,6 +683,15 @@ find_fd(int *fd, struct fsal_obj_handle *obj_hdl, bool bypass,
 				PTHREAD_RWLOCK_rdlock(&obj_hdl->obj_lock);
 			}
 			*fd = out_fd->fd;
+
+			if (state == NULL) { /* anonymous I/O */
+				if (out_fd == &temp_fd) {
+					assert(*closefd);
+				} else {
+					assert(out_fd == &myself->u.file.fd);
+					assert(!*closefd);
+				}
+			}
 		}
 		return status;
 

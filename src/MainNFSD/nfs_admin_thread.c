@@ -236,7 +236,8 @@ static bool admin_dbus_purge_gids(DBusMessageIter *args,
 		goto out;
 	}
 
-	uid2grp_clear_cache();
+//	uid2grp_clear_cache();
+	dump_lanes();
 
  out:
 	dbus_status_reply(&iter, success, errormsg);

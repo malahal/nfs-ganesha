@@ -60,6 +60,40 @@
 #include "gsh_lttng/mdcache.h"
 #endif
 
+#define OPENHANDLE_HANDLE_LEN 40
+struct gpfs_file_handle1
+{
+  uint16_t handle_size;
+  uint16_t handle_type;
+  uint16_t handle_version;
+  uint16_t handle_key_size;
+  uint32_t handle_fsid[2];
+  /* file identifier */
+  unsigned char f_handle[OPENHANDLE_HANDLE_LEN];
+};
+
+struct gpfs_fd1 {
+        /** The open and share mode etc. */
+        fsal_openflags_t openflags;
+        /** The gpfsfs file descriptor. */
+        int fd;
+};
+
+struct gpfs_fsal_obj_handle1 {
+        struct fsal_obj_handle obj_handle;
+        struct gpfs_file_handle1 *handle;
+        union {
+                struct {
+                        struct fsal_share share;
+                        struct gpfs_fd1 fd;
+                } file;
+                struct {
+                        unsigned char *link_content;
+                        int link_size;
+                } symlink;
+        } u;
+};
+
 /**
  *
  * @file mdcache_lru.c
@@ -224,6 +258,88 @@ static const uint32_t FD_FALLBACK_LIMIT = 0x400;
 	(LRU_ENTRY_L1_OR_L2(e) && \
 	((n) == LRU_SENTINEL_REFCOUNT+1) && \
 	 ((e)->fh_hk.inavl))
+
+static inline size_t dump_lru_lane(char *qname, size_t lane, struct lru_q_lane *qlane, struct lru_q *q, size_t *validFDs);
+void dump_lanes(void)
+{
+        struct lru_q *q;
+        struct lru_q_lane *qlane;
+        size_t lane;
+        size_t workL1=0, workL2=0, workcleanup=0;
+	size_t validL1=0, validL2=0, validcleanup=0, validFDs=0;
+
+        LogEvent(COMPONENT_CACHE_INODE_LRU, "Dumping all L1 queues");
+        for (lane = 0; lane < LRU_N_Q_LANES; ++lane) {
+                qlane =  &LRU[lane];
+                q = &qlane->L1;
+                workL1 += dump_lru_lane("L1", lane, qlane, q, &validFDs);
+		validL1 += validFDs;
+        }
+
+        LogEvent(COMPONENT_CACHE_INODE_LRU, "Dumping all L2 queues");
+        for (lane = 0; lane < LRU_N_Q_LANES; ++lane) {
+                qlane =  &LRU[lane];
+                q = &qlane->L2;
+                workL2 += dump_lru_lane("L2", lane, qlane, q, &validFDs);
+		validL2 += validFDs;
+        }
+
+        LogEvent(COMPONENT_CACHE_INODE_LRU, "Dumping all cleanup queues");
+        for (lane = 0; lane < LRU_N_Q_LANES; ++lane) {
+                qlane =  &LRU[lane];
+                q = &qlane->cleanup;
+                workcleanup += dump_lru_lane("cleanup", lane, qlane, q, &validFDs);
+		validcleanup += validFDs;
+        }
+
+        LogEvent(COMPONENT_CACHE_INODE_LRU, "TOTAL ENTRIES at L1:%zd, L2:%zd, cleanup:%zd and TOTAL GLOBAL FDs at L1:%zd, L2:%zd, cleanup:%zd",
+		 workL1, workL2, workcleanup, validL1, validL2, validcleanup);
+}
+
+static inline size_t dump_lru_lane(char *qname, size_t lane, struct lru_q_lane *qlane, struct lru_q *q, size_t *validFDs)
+{
+        /* The amount of work done on this lane on this pass. */
+        size_t workdone = 0;
+	size_t valid_globalfds = 0;
+        /* The entry being examined */
+        mdcache_lru_t *lru = NULL;
+        mdcache_entry_t *entry;
+        struct fsal_obj_handle *obj_hdl;
+        struct gpfs_fsal_obj_handle1 *gpfs_hdl;
+        mdcache_entry_t *sub_entry;
+
+	*validFDs = 0;
+
+        /* ACTIVE */
+        QLOCK(qlane);
+        qlane->iter.active = true;
+
+        glist_for_each_safe(qlane->iter.glist, qlane->iter.glistn, &q->q) {
+                lru = glist_entry(qlane->iter.glist, mdcache_lru_t, q);
+
+                /* get entry early */
+                entry = container_of(lru, mdcache_entry_t, lru);
+
+                sub_entry =
+                        container_of(&entry->obj_handle, mdcache_entry_t, obj_handle);
+                obj_hdl = sub_entry->sub_handle;
+                gpfs_hdl = container_of(obj_hdl, struct gpfs_fsal_obj_handle1, obj_handle);
+                if(gpfs_hdl != NULL && gpfs_hdl->u.file.fd.fd!=0 && gpfs_hdl->u.file.fd.fd!=-1) {
+			valid_globalfds++;
+		}
+                ++workdone;
+        } /* for_each_safe lru */
+
+        qlane->iter.active = false; /* !ACTIVE */
+        QUNLOCK(qlane);
+
+        if(valid_globalfds != 0)
+                LogEvent(COMPONENT_CACHE_INODE_LRU,
+                         "In %s, Lane:%zd, Total entries:%zd, Total valid global fds: %zd",
+                         qname, lane, workdone, valid_globalfds);
+	*validFDs = valid_globalfds;
+        return valid_globalfds;
+}
 
 /**
  * @brief Initialize a single base queue.

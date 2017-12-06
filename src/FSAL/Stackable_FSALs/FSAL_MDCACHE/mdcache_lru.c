@@ -259,7 +259,15 @@ static const uint32_t FD_FALLBACK_LIMIT = 0x400;
 	((n) == LRU_SENTINEL_REFCOUNT+1) && \
 	 ((e)->fh_hk.inavl))
 
-static inline size_t dump_lru_lane(char *qname, size_t lane, struct lru_q_lane *qlane, struct lru_q *q, size_t *validFDs);
+struct refcnt_track {
+	int32_t refcnt1;
+	int32_t refcnt2;
+	int32_t refcnt3;
+	int32_t other_refcnt;	
+};
+
+static inline size_t dump_lru_lane(char *qname, size_t lane, struct lru_q_lane *qlane,
+				   struct lru_q *q, size_t *validFDs, struct refcnt_track *refcnts);
 void dump_lanes(void)
 {
         struct lru_q *q;
@@ -267,36 +275,48 @@ void dump_lanes(void)
         size_t lane;
         size_t workL1=0, workL2=0, workcleanup=0;
 	size_t validL1=0, validL2=0, validcleanup=0, validFDs=0;
+	struct refcnt_track refcntsL1, refcntsL2, refcntscleanup;	
 
         LogEvent(COMPONENT_CACHE_INODE_LRU, "Dumping all L1 queues");
+	memset(&refcntsL1, 0, sizeof(struct refcnt_track));
         for (lane = 0; lane < LRU_N_Q_LANES; ++lane) {
                 qlane =  &LRU[lane];
                 q = &qlane->L1;
-                workL1 += dump_lru_lane("L1", lane, qlane, q, &validFDs);
+                workL1 += dump_lru_lane("L1", lane, qlane, q, &validFDs, &refcntsL1);
 		validL1 += validFDs;
         }
 
         LogEvent(COMPONENT_CACHE_INODE_LRU, "Dumping all L2 queues");
+	memset(&refcntsL2, 0, sizeof(struct refcnt_track));
         for (lane = 0; lane < LRU_N_Q_LANES; ++lane) {
                 qlane =  &LRU[lane];
                 q = &qlane->L2;
-                workL2 += dump_lru_lane("L2", lane, qlane, q, &validFDs);
+                workL2 += dump_lru_lane("L2", lane, qlane, q, &validFDs, &refcntsL2);
 		validL2 += validFDs;
         }
 
         LogEvent(COMPONENT_CACHE_INODE_LRU, "Dumping all cleanup queues");
+	memset(&refcntscleanup, 0, sizeof(struct refcnt_track));
         for (lane = 0; lane < LRU_N_Q_LANES; ++lane) {
                 qlane =  &LRU[lane];
                 q = &qlane->cleanup;
-                workcleanup += dump_lru_lane("cleanup", lane, qlane, q, &validFDs);
+                workcleanup += dump_lru_lane("cleanup", lane, qlane, q, &validFDs, &refcntscleanup);
 		validcleanup += validFDs;
         }
 
         LogEvent(COMPONENT_CACHE_INODE_LRU, "TOTAL ENTRIES at L1:%zd, L2:%zd, cleanup:%zd and TOTAL GLOBAL FDs at L1:%zd, L2:%zd, cleanup:%zd",
 		 workL1, workL2, workcleanup, validL1, validL2, validcleanup);
+	LogEvent(COMPONENT_CACHE_INODE_LRU, "REFCNTS at L1: refcnt1: %d, refcnt2: %d, refcnt3: %d, other_refcnt: %d",
+		refcntsL1.refcnt1, refcntsL1.refcnt2, refcntsL1.refcnt3, refcntsL1.other_refcnt);
+        LogEvent(COMPONENT_CACHE_INODE_LRU, "REFCNTS at L2: refcnt1: %d, refcnt2: %d, refcnt3: %d, other_refcnt: %d",
+                refcntsL2.refcnt1, refcntsL2.refcnt2, refcntsL2.refcnt3, refcntsL2.other_refcnt);
+        LogEvent(COMPONENT_CACHE_INODE_LRU, "REFCNTS at cleanup: refcnt1: %d, refcnt2: %d, refcnt3: %d, other_refcnt: %d",
+                refcntscleanup.refcnt1, refcntscleanup.refcnt2, refcntscleanup.refcnt3, refcntscleanup.other_refcnt);
+
 }
 
-static inline size_t dump_lru_lane(char *qname, size_t lane, struct lru_q_lane *qlane, struct lru_q *q, size_t *validFDs)
+static inline size_t dump_lru_lane(char *qname, size_t lane, struct lru_q_lane *qlane,
+				   struct lru_q *q, size_t *validFDs, struct refcnt_track *refcnts)
 {
         /* The amount of work done on this lane on this pass. */
         size_t workdone = 0;
@@ -307,6 +327,7 @@ static inline size_t dump_lru_lane(char *qname, size_t lane, struct lru_q_lane *
         struct fsal_obj_handle *obj_hdl;
         struct gpfs_fsal_obj_handle1 *gpfs_hdl;
         mdcache_entry_t *sub_entry;
+	int32_t refcnt;
 
 	*validFDs = 0;
 
@@ -327,6 +348,24 @@ static inline size_t dump_lru_lane(char *qname, size_t lane, struct lru_q_lane *
                 if(gpfs_hdl != NULL && gpfs_hdl->u.file.fd.fd!=0 && gpfs_hdl->u.file.fd.fd!=-1) {
 			valid_globalfds++;
 		}
+
+		refcnt = atomic_fetch_int32_t(&lru->refcnt);
+		switch (refcnt) {
+			case 1:
+				refcnts->refcnt1++;
+				break;
+			case 2:
+				refcnts->refcnt2++;
+				break;
+			case 3:
+				refcnts->refcnt3++;
+				break;
+			default:
+				if (refcnt > 3)
+					refcnts->other_refcnt++;
+				break;
+		}
+		
                 ++workdone;
         } /* for_each_safe lru */
 
@@ -338,7 +377,7 @@ static inline size_t dump_lru_lane(char *qname, size_t lane, struct lru_q_lane *
                          "In %s, Lane:%zd, Total entries:%zd, Total valid global fds: %zd",
                          qname, lane, workdone, valid_globalfds);
 	*validFDs = valid_globalfds;
-        return valid_globalfds;
+        return workdone;
 }
 
 /**

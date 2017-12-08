@@ -151,6 +151,7 @@ open_by_handle(struct fsal_obj_handle *obj_hdl, struct state_t *state,
 	fsal_status_t status;
 	const bool truncated = (posix_flags & O_TRUNC) != 0;
 	struct gpfs_fd *my_fd;
+	bool opened;
 
 	/* This can block over an I/O operation. */
 	PTHREAD_RWLOCK_wrlock(&obj_hdl->obj_lock);
@@ -186,14 +187,25 @@ open_by_handle(struct fsal_obj_handle *obj_hdl, struct state_t *state,
 		my_fd = &gpfs_hdl->u.file.fd;
 	}
 
-	status = GPFSFSAL_open(obj_hdl, op_ctx, posix_flags, &my_fd->fd);
+	/* @TODO: only good for NFSv3 atm */
+	if (my_fd->openflags != FSAL_O_CLOSED) {
+		assert(my_fd->fd >= 0);
+		status = fsalstat(ERR_FSAL_NO_ERROR, 0);
+		opened = false;
+	} else {
+		status = GPFSFSAL_open(obj_hdl, op_ctx, posix_flags,
+				&my_fd->fd);
+		opened = true;
+	}
 	if (FSAL_IS_ERROR(status)) {
 		if (state == NULL)
 			goto out;
 		else
 			goto undo_share;
 	}
-	my_fd->openflags = openflags;
+
+	if (opened)
+		my_fd->openflags = openflags;
 
 	if (attrs_out && (createmode >= FSAL_EXCLUSIVE || truncated)) {
 		/* Refresh the attributes */
@@ -229,6 +241,7 @@ open_by_handle(struct fsal_obj_handle *obj_hdl, struct state_t *state,
 		return status;
 	}
 
+	/* Locking here for state case ??? */
 	(void) fsal_internal_close(my_fd->fd, state->state_owner, 0);
 	my_fd->fd = -1;
 	my_fd->openflags = FSAL_O_CLOSED;

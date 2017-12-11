@@ -2628,8 +2628,6 @@ again:
 				*has_lock = false;
 				return status;
 			}
-
-			(void) atomic_inc_size_t(&open_fd_count);
 		}
 
 		/* Ok, now we should be in the correct mode.

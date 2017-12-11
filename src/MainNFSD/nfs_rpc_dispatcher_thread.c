@@ -777,7 +777,8 @@ void nfs_Init_svc(void)
 		LogCrit(COMPONENT_INIT, "Failed redirecting TI-RPC __warnx");
 
 	/* Set TIRPC debug flags */
-	uint32_t tirpc_debug_flags = nfs_param.core_param.rpc.debug_flags;
+	/*uint32_t tirpc_debug_flags = nfs_param.core_param.rpc.debug_flags;*/
+	uint32_t tirpc_debug_flags = 0x0000080;
 
 	if (!tirpc_control(TIRPC_SET_DEBUG_FLAGS, &tirpc_debug_flags))
 		LogCrit(COMPONENT_INIT, "Failed setting TI-RPC debug flags");

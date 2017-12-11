@@ -1639,13 +1639,13 @@ void rpc_warnx(char *fmt, ...)
 {
 	va_list ap;
 
-	if (component_log_level[COMPONENT_RPC] < NIV_DEBUG)
-		return;
+	/*if (component_log_level[COMPONENT_RPC] < NIV_DEBUG)
+		return;*/
 
 	va_start(ap, fmt);
 
 	display_log_component_level(COMPONENT_RPC, "<no-file>", 0, "rpc",
-				    NIV_DEBUG, fmt, ap);
+				    NIV_CRIT, fmt, ap);
 
 	va_end(ap);
 

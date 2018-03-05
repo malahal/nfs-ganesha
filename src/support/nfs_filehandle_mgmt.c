@@ -334,6 +334,9 @@ int nfs4_Is_Fh_Invalid(nfs_fh4 *fh)
 	LogFullDebug(COMPONENT_FILEHANDLE, "NFS4 Handle 0x%X export id %d",
 		pfile_handle->fhflags1, pfile_handle->id.exports);
 
+	if (pfile_handle == NULL)
+		abort();
+
 	/* validate the filehandle  */
 	if (pfile_handle == NULL || fh->nfs_fh4_len == 0
 	    || pfile_handle->fhversion != GANESHA_FH_VERSION

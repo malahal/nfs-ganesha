@@ -35,6 +35,18 @@
 #include "fsal_convert.h"
 #include "gpfs_methods.h"
 
+static uint64_t get_handle2inode(struct gpfs_file_handle *gfh)
+{
+	struct f_handle {
+		char unused1[8];
+		uint64_t inode;  /* inode for file */
+		char unused2[8];
+		uint64_t pinode; /* inode for parent */
+	} *f_handle = (struct f_handle *)gfh->f_handle;
+
+	return f_handle->inode;
+}
+
 /**
  *  @brief Looks up for an object into a directory.
  *
@@ -99,6 +111,28 @@ GPFSFSAL_lookup(const struct req_op_context *op_ctx,
 
 	status = fsal_internal_get_handle_at(parent_fd, filename, fh,
 					     export_fd);
+
+	/* GPFS returns ENOENT for lookup of ".." in the root directory.
+	 * If so, fill in the handle ourselves and act as though it
+	 * succeeded.
+	 */
+	if (status.major == ERR_FSAL_NOENT &&
+	    strncmp(filename, "..", 3) == 0) {
+		unsigned long long pinode;
+
+		pinode = get_handle2inode(parent_hdl->handle);
+		if (pinode == 3) {
+			LogEvent(COMPONENT_FSAL,
+				 "Lookup of DOTDOT failed in ROOT dir");
+			*fh = *parent_hdl->handle;
+			status = fsalstat(ERR_FSAL_NO_ERROR, 0);
+		} else {
+			LogEvent(COMPONENT_FSAL,
+				 "Lookup of DOTDOT failed in dirinode: %llu",
+				 pinode);
+		}
+	}
+
 	if (FSAL_IS_ERROR(status)) {
 		close(parent_fd);
 		return status;

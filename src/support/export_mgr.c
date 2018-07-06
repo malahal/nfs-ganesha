@@ -1810,6 +1810,53 @@ static struct gsh_dbus_method reset_statistics = {
 		 END_ARG_LIST}
 };
 
+struct pool_alloc_list *pool_list=NULL;
+struct pool_alloc_list *pool_list_current=NULL;
+
+/**
+ * DBUS method to get pool allocation numbers
+ */
+static bool stats_pool(DBusMessageIter *args,
+			DBusMessage *reply,
+			DBusError *error)
+{
+	bool success = true;
+	char *errormsg = "OK";
+	DBusMessageIter iter, array_iter;
+	struct timespec timestamp;
+	struct pool_alloc_list *current = pool_list;
+
+	now(&timestamp);
+	dbus_message_iter_init_append(reply, &iter);
+	dbus_status_reply(&iter, success, errormsg);
+	dbus_append_timestamp(&iter, &timestamp);
+	dbus_message_iter_open_container(&iter, DBUS_TYPE_STRUCT,
+					 NULL, &array_iter);
+	while(current) {
+		if (current->pool_ptr->name == NULL) {
+			errormsg = "Hash Table Related";
+			dbus_message_iter_append_basic(&array_iter,DBUS_TYPE_STRING, &errormsg);
+		}
+		else
+			dbus_message_iter_append_basic(&array_iter,DBUS_TYPE_STRING, &current->pool_ptr->name);
+		dbus_message_iter_append_basic(&array_iter,DBUS_TYPE_UINT64,&current->pool_ptr->cnt);
+		dbus_message_iter_append_basic(&array_iter,DBUS_TYPE_UINT64,&current->pool_ptr->object_size);
+		current = current->next;
+	}
+	dbus_message_iter_close_container(&iter, &array_iter);
+
+	return true;
+}
+
+static struct gsh_dbus_method pool_statistics = {
+	.name = "PoolStats",
+	.method = stats_pool,
+	.args = {STATUS_REPLY,
+		 TIMESTAMP_REPLY,
+		 POOL_STATUS_REPLY,
+		 END_ARG_LIST}
+};
+
 /**
  * DBUS method to disable statistics counting
  *
@@ -2146,6 +2193,7 @@ static struct gsh_dbus_method *export_stats_methods[] = {
 	&cache_inode_show,
 	&export_show_all_io,
 	&reset_statistics,
+	&pool_statistics,
 	&fsal_statistics,
 	&enable_statistics,
 	&disable_statistics,

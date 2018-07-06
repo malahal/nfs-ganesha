@@ -208,6 +208,13 @@ struct export_stats {
 	.direction = "out"	\
 }
 
+#define POOL_STATUS_REPLY	\
+{				\
+	.name = "pool_status",	\
+	.type = "a(stt)",	\
+	.direction = "out"	\
+}
+
 /* number of delegations, number of sent recalls,
  * number of failed recalls, number of revokes */
 #define DELEG_REPLY		       \

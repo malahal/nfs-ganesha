@@ -23,6 +23,8 @@ def usage():
     message += "%s reset \n" % (sys.argv[0])
     message += "To enable/disable stat counters use \n"
     message += "%s [enable | disable] [all | nfs | fsal] " % (sys.argv[0])
+    message += "To get the current memory pool allocation\n"
+    message += "%s pool" % (sys.argv[0])
     sys.exit(message)
 
 if len(sys.argv) < 2:
@@ -33,7 +35,7 @@ else:
 # check arguments
 commands = ('help', 'list_clients', 'deleg', 'global', 'inode', 'iov3', 'iov4',
 	    'export', 'total', 'fast', 'pnfs', 'fsal', 'reset', 'enable',
-	    'disable')
+	    'disable', 'pool')
 if command not in commands:
     print "Option \"%s\" is not correct." % (command)
     usage()
@@ -99,3 +101,5 @@ elif command == "enable":
     print exp_interface.enable_stats(command_arg)
 elif command == "disable":
     print exp_interface.disable_stats(command_arg)
+elif command == "pool":
+    print exp_interface.pool_stats()

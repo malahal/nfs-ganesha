@@ -42,6 +42,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+#include <abstract_atomic.h>
 #include "log.h"
 
 /**
@@ -302,7 +303,16 @@ gsh_free_size(void *p, size_t n __attribute__ ((unused)))
 typedef struct pool {
 	char *name; /*< The name of the pool */
 	size_t object_size; /*< The size of the objects created */
+	uint64_t cnt;  /* < counter to keep track of allocations */
 } pool_t;
+
+struct pool_alloc_list{
+	pool_t *pool_ptr;
+	struct pool_alloc_list *next;
+};
+
+extern struct pool_alloc_list *pool_list;
+extern struct pool_alloc_list *pool_list_current;
 
 /**
  * @brief Create a basic object pool
@@ -343,6 +353,20 @@ pool_basic_init__(const char *name, size_t object_size,
 	else
 		pool->name = NULL;
 
+	(void)atomic_store_uint64_t(&pool->cnt, 0);
+	if (pool_list == NULL) {
+		pool_list = (struct pool_alloc_list *) gsh_malloc__(sizeof(struct pool_alloc_list),
+							file, line, function);
+		pool_list_current = pool_list;
+		pool_list_current->pool_ptr = pool;
+		pool_list_current->next = NULL;
+	} else {
+		pool_list_current->next = (struct pool_alloc_list *) gsh_malloc__(sizeof(struct pool_alloc_list),
+									file, line, function);
+		pool_list_current = pool_list_current->next;
+		pool_list_current->pool_ptr = pool;
+		pool_list_current->next = NULL;
+	}
 	return pool;
 }
 
@@ -392,7 +416,10 @@ pool_destroy(pool_t *pool)
 static inline void *
 pool_alloc__(pool_t *pool, const char *file, int line, const char *function)
 {
-	return gsh_calloc__(1, pool->object_size, file, line, function);
+	void *ptr;
+	ptr = gsh_calloc__(1, pool->object_size, file, line, function);
+	(void)atomic_inc_uint64_t(&pool->cnt);
+	return ptr;
 }
 
 #define pool_alloc(pool) \
@@ -418,6 +445,7 @@ static inline void
 pool_free(pool_t *pool, void *object)
 {
 	gsh_free(object);
+	(void)atomic_dec_uint64_t(&pool->cnt);
 }
 
 #endif /* ABSTRACT_MEM_H */

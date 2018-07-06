@@ -113,6 +113,11 @@ class RetrieveExportStats():
         stats_state = self.exportmgrobj.get_dbus_method("DisableStats",
                                   self.dbus_exportstats_name)
         return StatsDisable(stats_state(stat_type))
+    # Get the pool allocation numbers
+    def pool_stats(self):
+        stats_state = self.exportmgrobj.get_dbus_method("PoolStats",
+                                  self.dbus_exportstats_name)
+        return StatsPool(stats_state())
 
 class RetrieveClientStats():
     def __init__(self):
@@ -431,3 +436,22 @@ class StatsDisable():
             return "Failed to disable statistics counting, GANESHA RESPONSE STATUS: " + self.status[1]
         else:
             return "Successfully disabled statistics counting"
+
+class StatsPool():
+    def __init__(self, status):
+        self.status = status
+    def __str__(self):
+	output = ""
+        if self.status[0]:
+	    output += ("Timestamp: " + time.ctime(self.status[2][0]) + str(self.status[2][1]) + " nsecs\n")
+            output += "\t\t Pool \t\t : Allocations : Size per allocation" 
+	    tot_len = len(self.status[3])
+	    i = 0
+	    while (i+3) <= tot_len:
+	    	output += "\n\t" + (self.status[3][i+0]).ljust(25) 
+		output += ": %s" % (str(self.status[3][i+1]).rjust(12))
+		output += ": %s" % (str(self.status[3][i+2]).rjust(10))
+		i += 3
+	    return output
+        else:
+            return "Failed to get Pool allocation numbers"

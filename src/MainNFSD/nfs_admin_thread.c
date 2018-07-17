@@ -33,6 +33,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <pthread.h>
+#include <malloc.h>
 #include "nfs_core.h"
 #include "log.h"
 #include "sal_functions.h"
@@ -236,6 +237,10 @@ static bool admin_dbus_purge_gids(DBusMessageIter *args,
 		goto out;
 	}
 
+	/* Just to check if trim helps with
+	 * Ganesha using high memory
+	 */
+	malloc_trim(0);
 	uid2grp_clear_cache();
 
  out:

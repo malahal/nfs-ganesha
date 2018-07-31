@@ -400,7 +400,8 @@ cmake .	-DCMAKE_BUILD_TYPE=Debug			\
 	-DWBCLIENT_INCLUDE_DIR=/usr/lpp/mmfs/include/samba-4.0		\
 	-DWBCLIENT_LIBRARIES=/usr/lpp/mmfs/lib64/libwbclient.so.0	\
 	-DCMAKE_INSTALL_RPATH=/usr/lpp/mmfs/lib64/			\
-	-DCMAKE_BUILD_WITH_INSTALL_RPATH=ON
+	-DCMAKE_BUILD_WITH_INSTALL_RPATH=ON                             \
+	-D_VALGRIND_MEMCHECK=ON
 %endif
 
 make %{?_smp_mflags} || make %{?_smp_mflags} || make

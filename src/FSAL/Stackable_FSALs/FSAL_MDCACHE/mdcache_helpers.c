@@ -53,6 +53,9 @@
 #include "gsh_lttng/mdcache.h"
 #endif
 
+#define mdc_chunk_first_dirent(c) \
+	glist_first_entry(&(c)->dirents, mdcache_dir_entry_t, chunk_list)
+
 static inline bool trust_negative_cache(mdcache_entry_t *parent)
 {
 	bool trust = op_ctx_export_has_option(
@@ -463,7 +466,6 @@ void mdcache_clean_dirent_chunk(struct dir_chunk *chunk)
 	 */
 
 	chunk->parent = NULL;
-	chunk->prev_chunk = NULL;
 	chunk->next_ck = 0;
 	chunk->num_entries = 0;
 }
@@ -1897,7 +1899,7 @@ void place_new_dirent(mdcache_entry_t *parent_dir,
 	struct avltree_node *node, *parent, *unbalanced, *other;
 	int is_left, code;
 	fsal_cookie_t ck, nck;
-	struct dir_chunk *chunk;
+	struct dir_chunk *chunk, *prev_chunk;
 	bool invalidate_chunks = true;
 
 #ifdef DEBUG_MDCACHE
@@ -2086,9 +2088,12 @@ void place_new_dirent(mdcache_entry_t *parent_dir,
 	/* Note in the following, every dirent that is in the sorted tree MUST
 	 * be in a chunk, so we don't check for chunk != NULL.
 	 */
+	prev_chunk = mdc_prev_chunk(right->chunk);
+
 	if (left != NULL && right != NULL &&
 	    left->chunk != right->chunk &&
-	    left->chunk != right->chunk->prev_chunk) {
+	    left->chunk != prev_chunk &&
+	    prev_chunk->next_ck != mdc_chunk_first_dirent(right->chunk)->ck) {
 		/* left and right are in different non-adjacent chunks, however,
 		 * we can still trust the chunks since the new entry is part of
 		 * the directory we don't have cached, a readdir that wants that
@@ -2188,9 +2193,6 @@ void place_new_dirent(mdcache_entry_t *parent_dir,
 		split = mdcache_get_chunk(parent_dir, chunk);
 		split->next_ck = chunk->next_ck;
 
-		glist_add_tail(&chunk->parent->fsobj.fsdir.chunks,
-			       &split->chunks);
-
 		/* Make sure this chunk is in the MRU of L1 */
 		lru_bump_chunk(split);
 
@@ -2285,16 +2287,10 @@ mdc_readdir_chunk_object(const char *name, struct fsal_obj_handle *sub_handle,
 			     "Readdir readahead first entry in new chunk %s",
 			     name);
 
-		/* Now add the previous chunk to the list of chunks for the
-		 * directory.
-		 */
-		glist_add_tail(&chunk->parent->fsobj.fsdir.chunks,
-			       &chunk->chunks);
-
+		/* Chunk is aded to the chunks list before being passed in */
 		/* Now start a new chunk, passing this chunk as prev_chunk. */
 		chunk = mdcache_get_chunk(chunk->parent, chunk);
 
-		/* And switch over to new chunk. */
 		state->dir_state = chunk;
 
 		/* And start accepting entries into the new chunk. */
@@ -2455,7 +2451,7 @@ mdc_readdir_chunk_object(const char *name, struct fsal_obj_handle *sub_handle,
 		 */
 		glist_add_tail(&chunk->dirents, &new_dir_entry->chunk_list);
 
-		if (chunk->num_entries == 0 && chunk->prev_chunk != NULL) {
+		if (chunk->num_entries == 0 && mdc_prev_chunk(chunk) != NULL) {
 			/* Link the first dirent in a new chunk to the previous
 			 * chunk so linkage across chunks works.
 			 *
@@ -2464,7 +2460,7 @@ mdc_readdir_chunk_object(const char *name, struct fsal_obj_handle *sub_handle,
 			 * readdir request, in which case prev_chunk had been
 			 * passed into mdcache_populate_dir_chunk.
 			 */
-			chunk->prev_chunk->next_ck = cookie;
+			mdc_prev_chunk(chunk)->next_ck = cookie;
 		}
 		chunk->num_entries++;
 	}
@@ -2714,7 +2710,7 @@ again:
 
 	if (chunk->num_entries == 0) {
 		/* Save the previous chunk in case we need it. */
-		struct dir_chunk *prev_chunk = chunk->prev_chunk;
+		struct dir_chunk *prev_chunk = mdc_prev_chunk(chunk);
 		mdcache_dir_entry_t *last;
 
 		/* Chunk is empty - should only happen for an empty directory
@@ -2774,11 +2770,6 @@ again:
 				"Chunk first entry %s%s",
 				*dirent != NULL ? (*dirent)->name : "<NONE>",
 				*eod_met ? " EOD" : "");
-
-		/* Now add this chunk to the list of chunks for the directory.
-		 */
-		glist_add_tail(&directory->fsobj.fsdir.chunks,
-			       &chunk->chunks);
 	}
 
 	if (state.whence_search && *dirent == NULL) {
@@ -2838,9 +2829,7 @@ again:
 		/* And switch over to new chunk. */
 		state.dir_state = chunk;
 
-		/* And go start a new FSAL readdir call.
-		 * chunk->prev_chunk will get set from prev_chunk.
-		 */
+		/* And go start a new FSAL readdir call.  */
 		goto again;
 	}
 

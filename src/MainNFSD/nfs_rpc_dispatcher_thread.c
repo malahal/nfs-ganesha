@@ -79,6 +79,13 @@ static struct rpc_evchan rpc_evchan[N_EVENT_CHAN];
 struct fridgethr *req_fridge;	/*< Decoder thread pool */
 struct nfs_req_st nfs_req_st;	/*< Shared request queues */
 
+const char *req_q_s[N_REQ_QUEUES] = {
+	"REQ_Q_MOUNT",
+	"REQ_Q_CALL",
+	"REQ_Q_LOW_LATENCY",
+	"REQ_Q_HIGH_LATENCY"
+};
+
 static u_int nfs_rpc_recv_user_data(SVCXPRT *xprt, SVCXPRT *newxprt,
 				    const u_int flags, void *u_data);
 static bool nfs_rpc_getreq_ng(SVCXPRT *xprt /*, int chan_id */);
@@ -1190,28 +1197,18 @@ void nfs_rpc_queue_init(void)
 			 "Unable to initialize decoder thread pool: %d", rc);
 
 	/* queues */
+	pthread_spin_init(&nfs_req_st.reqs.sp, PTHREAD_PROCESS_PRIVATE);
 	nfs_req_st.reqs.size = 0;
-	nfs_req_st.reqs.qwait = gsh_calloc(N_REQ_QUEUES, sizeof(struct qwait));
-	nfs_req_st.reqs.nfs_request_q.qset = gsh_calloc(N_REQ_QUEUES,
-						sizeof(struct req_q_pair));
-	/* N_REQ_QUEUES (nfs_param.core_param.nb_worker) must be initialized
-	 * by now. This check is to guard any inadvertent changes that could
-	 * make this assumption invalid.
-	 */
-	if (N_REQ_QUEUES == 0 || nfs_req_st.reqs.qwait == NULL ||
-			nfs_req_st.reqs.nfs_request_q.qset == NULL)
-		LogFatal(COMPONENT_DISPATCH,
-			 "Memory allocation for queues (%d) failed",
-			 N_REQ_QUEUES);
-
 	for (ix = 0; ix < N_REQ_QUEUES; ++ix) {
-		PTHREAD_MUTEX_init(&nfs_req_st.reqs.qwait[ix].wait_mutex, NULL);
-		PTHREAD_COND_init(&nfs_req_st.reqs.qwait[ix].wait_cond, NULL);
 		qpair = &(nfs_req_st.reqs.nfs_request_q.qset[ix]);
-		qpair->s = "mixed";
+		qpair->s = req_q_s[ix];
 		nfs_rpc_q_init(&qpair->producer);
 		nfs_rpc_q_init(&qpair->consumer);
 	}
+
+	/* waitq */
+	glist_init(&nfs_req_st.reqs.wait_list);
+	nfs_req_st.reqs.waiters = 0;
 
 	/* stallq */
 	gsh_mutex_init(&nfs_req_st.stallq.mtx, NULL);
@@ -1238,9 +1235,6 @@ void nfs_rpc_enqueue_req(request_data_t *reqdata)
 	struct req_q_set *nfs_request_q;
 	struct req_q_pair *qpair;
 	struct req_q *q;
-	static uint32_t mslot;
-	uint32_t slot;
-	uint32_t active;
 
 #if defined(HAVE_BLKIN)
 	BLKIN_TIMESTAMP(
@@ -1253,21 +1247,27 @@ void nfs_rpc_enqueue_req(request_data_t *reqdata)
 
 	switch (reqdata->rtype) {
 	case NFS_REQUEST:
-	case NFS_CALL:
 		LogFullDebug(COMPONENT_DISPATCH,
 			     "enter rq_xid=%u lookahead.flags=%u",
 			     reqdata->r_u.req.svc.rq_xid,
 			     reqdata->r_u.req.lookahead.flags);
-
-		slot = atomic_inc_uint32_t(&mslot) & (N_REQ_QUEUES - 1);
-		qpair = &(nfs_request_q->qset[slot]);
+		if (reqdata->r_u.req.lookahead.flags & NFS_LOOKAHEAD_MOUNT) {
+			qpair = &(nfs_request_q->qset[REQ_Q_MOUNT]);
+			break;
+		}
+		if (NFS_LOOKAHEAD_HIGH_LATENCY(reqdata->r_u.req.lookahead))
+			qpair = &(nfs_request_q->qset[REQ_Q_HIGH_LATENCY]);
+		else
+			qpair = &(nfs_request_q->qset[REQ_Q_LOW_LATENCY]);
+		break;
+	case NFS_CALL:
+		qpair = &(nfs_request_q->qset[REQ_Q_CALL]);
 		break;
 #ifdef _USE_9P
 	case _9P_REQUEST:
 		/* XXX identify high-latency requests and allocate
 		 * to the high-latency queue, as above */
-		slot = 0;
-		qpair = &(nfs_request_q->qset[slot]);
+		qpair = &(nfs_request_q->qset[REQ_Q_LOW_LATENCY]);
 		break;
 #endif
 	default:
@@ -1282,7 +1282,6 @@ void nfs_rpc_enqueue_req(request_data_t *reqdata)
 	pthread_spin_lock(&q->sp);
 	glist_add_tail(&q->q, &reqdata->req_q);
 	++(q->size);
-	active = q->size;
 	pthread_spin_unlock(&q->sp);
 
 	atomic_inc_uint32_t(&enqueued_reqs);
@@ -1307,13 +1306,36 @@ void nfs_rpc_enqueue_req(request_data_t *reqdata)
 		 enqueued_reqs, dequeued_reqs);
 
 	/* potentially wakeup some thread */
-	if (active == 1) { /* q->size was zero before */
-		/* We could get consumer q->size as well, but waking the thread
-		 * more times is OK
-		 */
-		PTHREAD_MUTEX_lock(&nfs_req_st.reqs.qwait[slot].wait_mutex);
-		pthread_cond_signal(&nfs_req_st.reqs.qwait[slot].wait_cond);
-		PTHREAD_MUTEX_unlock(&nfs_req_st.reqs.qwait[slot].wait_mutex);
+
+	/* global waitq */
+	{
+		wait_q_entry_t *wqe;
+
+		/* SPIN LOCKED */
+		pthread_spin_lock(&nfs_req_st.reqs.sp);
+		if (nfs_req_st.reqs.waiters) {
+			wqe = glist_first_entry(&nfs_req_st.reqs.wait_list,
+						wait_q_entry_t, waitq);
+
+			LogFullDebug(COMPONENT_DISPATCH,
+				     "nfs_req_st.reqs.waiters %u signal wqe %p (for q %p)",
+				     nfs_req_st.reqs.waiters, wqe, q);
+
+			/* release 1 waiter */
+			glist_del(&wqe->waitq);
+			--(nfs_req_st.reqs.waiters);
+			--(wqe->waiters);
+			/* ! SPIN LOCKED */
+			pthread_spin_unlock(&nfs_req_st.reqs.sp);
+			PTHREAD_MUTEX_lock(&wqe->lwe.mtx);
+			/* XXX reliable handoff */
+			wqe->flags |= Wqe_LFlag_SyncDone;
+			if (wqe->flags & Wqe_LFlag_WaitSync)
+				pthread_cond_signal(&wqe->lwe.cv);
+			PTHREAD_MUTEX_unlock(&wqe->lwe.mtx);
+		} else
+			/* ! SPIN LOCKED */
+			pthread_spin_unlock(&nfs_req_st.reqs.sp);
 	}
 
  out:
@@ -1378,56 +1400,106 @@ request_data_t *nfs_rpc_consume_req(struct req_q_pair *qpair)
 	return reqdata;
 }
 
-bool qpair_empty(struct req_q_pair *qpair)
-{
-	/* Do we need any locks */
-	return qpair->consumer.size + qpair->producer.size == 0;
-}
-
 request_data_t *nfs_rpc_dequeue_req(nfs_worker_data_t *worker)
 {
 	request_data_t *reqdata = NULL;
 	struct req_q_set *nfs_request_q = &nfs_req_st.reqs.nfs_request_q;
 	struct req_q_pair *qpair;
-	uint32_t slot;
+	uint32_t ix, slot;
 	struct timespec timeout;
 
 	/* XXX: the following stands in for a more robust/flexible
 	 * weighting function */
 
-	slot = worker->worker_index & (N_REQ_QUEUES - 1);
-	qpair = &(nfs_request_q->qset[slot]);
+	/* slot in 1..4 */
+ retry_deq:
+	slot = (nfs_rpc_q_next_slot() % 4);
+	for (ix = 0; ix < 4; ++ix) {
+		switch (slot) {
+		case 0:
+			/* MOUNT */
+			qpair = &(nfs_request_q->qset[REQ_Q_MOUNT]);
+			break;
+		case 1:
+			/* NFS_CALL */
+			qpair = &(nfs_request_q->qset[REQ_Q_CALL]);
+			break;
+		case 2:
+			/* LL */
+			qpair = &(nfs_request_q->qset[REQ_Q_LOW_LATENCY]);
+			break;
+		case 3:
+			/* HL */
+			qpair = &(nfs_request_q->qset[REQ_Q_HIGH_LATENCY]);
+			break;
+		default:
+			/* not here */
+			abort();
+			break;
+		}
 
-	LogFullDebug(COMPONENT_DISPATCH,
-		     "dequeue_req try qpair %s %p:%p", qpair->s,
-		     &qpair->producer, &qpair->consumer);
+		LogFullDebug(COMPONENT_DISPATCH,
+			     "dequeue_req try qpair %s %p:%p", qpair->s,
+			     &qpair->producer, &qpair->consumer);
 
-retry_deq:
-	/* anything? */
-	reqdata = nfs_rpc_consume_req(qpair);
-	if (reqdata) {
-		atomic_inc_uint32_t(&dequeued_reqs);
-	} else { /* wait */
+		/* anything? */
+		reqdata = nfs_rpc_consume_req(qpair);
+		if (reqdata) {
+			atomic_inc_uint32_t(&dequeued_reqs);
+			break;
+		}
+
+		++slot;
+		slot = slot % 4;
+
+	}			/* for */
+
+	/* wait */
+	if (!reqdata) {
 		struct fridgethr_context *ctx =
 			container_of(worker, struct fridgethr_context, wd);
+		wait_q_entry_t *wqe = &worker->wqe;
 
-		PTHREAD_MUTEX_lock(&nfs_req_st.reqs.qwait[slot].wait_mutex);
-		while (qpair_empty(qpair)) {
+		assert(wqe->waiters == 0); /* wqe is not on any wait queue */
+		PTHREAD_MUTEX_lock(&wqe->lwe.mtx);
+		wqe->flags = Wqe_LFlag_WaitSync;
+		wqe->waiters = 1;
+		/* XXX functionalize */
+		pthread_spin_lock(&nfs_req_st.reqs.sp);
+		glist_add_tail(&nfs_req_st.reqs.wait_list, &wqe->waitq);
+		++(nfs_req_st.reqs.waiters);
+		pthread_spin_unlock(&nfs_req_st.reqs.sp);
+		while (!(wqe->flags & Wqe_LFlag_SyncDone)) {
 			timeout.tv_sec = time(NULL) + 5;
 			timeout.tv_nsec = 0;
-			pthread_cond_timedwait(
-					&nfs_req_st.reqs.qwait[slot].wait_cond,
-					&nfs_req_st.reqs.qwait[slot].wait_mutex,
-					&timeout);
+			pthread_cond_timedwait(&wqe->lwe.cv, &wqe->lwe.mtx,
+					       &timeout);
 			if (fridgethr_you_should_break(ctx)) {
 				/* We are returning;
 				 * so take us out of the waitq */
-				PTHREAD_MUTEX_unlock(
-				&nfs_req_st.reqs.qwait[slot].wait_mutex);
+				pthread_spin_lock(&nfs_req_st.reqs.sp);
+				if (wqe->waitq.next != NULL
+				    || wqe->waitq.prev != NULL) {
+					/* Element is still in wqitq,
+					 * remove it */
+					glist_del(&wqe->waitq);
+					--(nfs_req_st.reqs.waiters);
+					--(wqe->waiters);
+					wqe->flags &=
+					    ~(Wqe_LFlag_WaitSync |
+					      Wqe_LFlag_SyncDone);
+				}
+				pthread_spin_unlock(&nfs_req_st.reqs.sp);
+				PTHREAD_MUTEX_unlock(&wqe->lwe.mtx);
 				return NULL;
 			}
 		}
-		PTHREAD_MUTEX_unlock(&nfs_req_st.reqs.qwait[slot].wait_mutex);
+
+		/* XXX wqe was removed from nfs_req_st.waitq
+		 * (by signalling thread) */
+		wqe->flags &= ~(Wqe_LFlag_WaitSync | Wqe_LFlag_SyncDone);
+		PTHREAD_MUTEX_unlock(&wqe->lwe.mtx);
+		LogFullDebug(COMPONENT_DISPATCH, "wqe wakeup %p", wqe);
 		goto retry_deq;
 	} /* !reqdata */
 

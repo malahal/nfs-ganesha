@@ -383,6 +383,7 @@ mdc_get_parent_handle(struct mdcache_fsal_export *export,
 		return status;
 
 	/* And store in the parent host-handle */
+	LogCrit(COMPONENT_FSAL, "setting parent: fh len: %d", (int)fh_desc.len);
 	mdcache_copy_fh(&entry->fsobj.fsdir.parent, &fh_desc);
 
 	return fsalstat(ERR_FSAL_NO_ERROR, 0);

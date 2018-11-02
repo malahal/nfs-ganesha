@@ -156,14 +156,18 @@ static fsal_status_t lookup(struct fsal_obj_handle *parent,
 	 * If we detect this error, send DELAY error and hope it goes
 	 * away on the retry!
 	 */
-	if (strncmp(path, "..", 2) == 0) {
+	if (strcmp(path, "..") == 0) {
 		struct gpfs_file_handle *gfh;
 		unsigned long long inode, pinode;
 
 		gfh = container_of(parent, struct gpfs_fsal_obj_handle,
 				       obj_handle)->handle;
+
 		inode = get_handle2inode(gfh);
 		pinode = get_handle2inode(fh);
+		LogCrit(COMPONENT_FSAL,
+			"DOTDOT lookup, pinode: %llu, inode: %llu",
+			pinode, inode);
 		if (inode == pinode && inode > 9) {
 			LogCrit(COMPONENT_FSAL,
 				"DOTDOT error, inode: %llu", inode);

@@ -199,8 +199,11 @@ static inline bool mdcache_lru_caching_fds(void)
 	return lru_state.caching_fds;
 }
 
+void lru_reuse_chunk(mdcache_entry_t *parent, struct dir_chunk *chunk);
 void lru_remove_chunk(struct dir_chunk *chunk);
-struct dir_chunk *mdcache_get_chunk(mdcache_entry_t *parent);
+struct dir_chunk *mdcache_get_chunk(mdcache_entry_t *parent,
+				    struct dir_chunk *prev_chunk,
+				    fsal_cookie_t whence);
 void lru_bump_chunk(struct dir_chunk *chunk);
 
 #endif				/* MDCACHE_LRU_H */

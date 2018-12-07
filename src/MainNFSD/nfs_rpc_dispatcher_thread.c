@@ -1271,6 +1271,7 @@ static bool nfs_rpc_cond_stall_xprt(SVCXPRT *xprt)
 {
 	gsh_xprt_private_t *xu;
 	bool activate = false;
+	char ipaddr_str[INET6_ADDRSTRLEN];
 	uint32_t nreqs = xprt->xp_requests;
 
 	/* check per-xprt quota */
@@ -1296,8 +1297,11 @@ static bool nfs_rpc_cond_stall_xprt(SVCXPRT *xprt)
 		return true;
 	}
 
-	LogEvent(COMPONENT_DISPATCH, "xprt %p has %u reqs, marking stalled",
-		 xprt, nreqs);
+	sprint_sockip((sockaddr_t *)svc_getrpccaller(xprt), ipaddr_str,
+		      sizeof(ipaddr_str));
+	LogEvent(COMPONENT_DISPATCH,
+		 "xprt %p (caller ip: %s) has %u reqs, marking stalled",
+		 xprt, ipaddr_str, nreqs);
 
 	/* ok, need to stall */
 	PTHREAD_MUTEX_lock(&nfs_req_st.stallq.mtx);

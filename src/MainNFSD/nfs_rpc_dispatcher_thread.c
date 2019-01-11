@@ -782,18 +782,6 @@ void nfs_Init_svc(void)
 	if (!tirpc_control(TIRPC_SET_DEBUG_FLAGS, &tirpc_debug_flags))
 		LogCrit(COMPONENT_INIT, "Failed setting TI-RPC debug flags");
 
-#define TIRPC_SET_ALLOCATORS 0
-#if TIRPC_SET_ALLOCATORS
-	if (!tirpc_control(TIRPC_SET_MALLOC, (mem_alloc_t) gsh_malloc))
-		LogCrit(COMPONENT_INIT, "Failed redirecting TI-RPC alloc");
-
-	if (!tirpc_control(TIRPC_SET_MEM_FREE, (mem_free_t) gsh_free_size))
-		LogCrit(COMPONENT_INIT, "Failed redirecting TI-RPC mem_free");
-
-	if (!tirpc_control(TIRPC_SET_FREE, (std_free_t) gsh_free))
-		LogCrit(COMPONENT_INIT, "Failed redirecting TI-RPC __free");
-#endif				/* TIRPC_SET_ALLOCATORS */
-
 	for (ix = 0; ix < N_EVENT_CHAN; ++ix) {
 		rpc_evchan[ix].chan_id = 0;
 		code = svc_rqst_new_evchan(&rpc_evchan[ix].chan_id,

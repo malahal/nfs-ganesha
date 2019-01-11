@@ -88,7 +88,18 @@ gsh_malloc__(size_t n,
 	return p;
 }
 
+#ifdef LINUX
+#define gsh_malloc(n) ({ \
+	void *p_ = malloc(n); \
+	if (p_ == NULL) { \
+		LogMallocFailure(__FILE__, __LINE__, __func__, "gsh_malloc"); \
+		abort(); \
+	} \
+	p_; \
+	})
+#else
 #define gsh_malloc(n) gsh_malloc__(n, __FILE__, __LINE__, __func__)
+#endif
 
 /**
  * @brief Allocate aligned memory
@@ -125,8 +136,22 @@ gsh_malloc_aligned__(size_t a, size_t n,
 	return p;
 }
 
+#ifdef LINUX
+#define gsh_malloc_aligned(a, n) ({ \
+	void *p_; \
+	if (posix_memalign(&p_, a, n) != 0) \
+		p_ = NULL; \
+	if (p_ == NULL) { \
+		LogMallocFailure(__FILE__, __LINE__, __func__, \
+				 "gsh_malloc_aligned"); \
+		abort(); \
+	} \
+	p_; \
+	})
+#else
 #define gsh_malloc_aligned(a, n) \
 	gsh_malloc_aligned__(a, n, __FILE__, __LINE__, __func__)
+#endif
 
 /**
  * @brief Allocate zeroed memory
@@ -155,7 +180,18 @@ gsh_calloc__(size_t n, size_t s,
 	return p;
 }
 
+#ifdef LINUX
+#define gsh_calloc(n, s) ({ \
+	void *p_ = calloc(n, s); \
+	if (p_ == NULL) { \
+		LogMallocFailure(__FILE__, __LINE__, __func__, "gsh_calloc"); \
+		abort(); \
+	} \
+	p_; \
+	})
+#else
 #define gsh_calloc(n, s) gsh_calloc__(n, s, __FILE__, __LINE__, __func__)
+#endif
 
 /**
  * @brief Resize a block of memory
@@ -188,7 +224,18 @@ gsh_realloc__(void *p, size_t n,
 	return p2;
 }
 
+#ifdef LINUX
+#define gsh_realloc(p, n) ({ \
+	void *p2_ = realloc(p, n); \
+	if (n != 0 && p2_ == NULL) { \
+		LogMallocFailure(__FILE__, __LINE__, __func__, "gsh_realloc"); \
+		abort(); \
+	} \
+	p2_; \
+	})
+#else
 #define gsh_realloc(p, n) gsh_realloc__(p, n, __FILE__, __LINE__, __func__)
+#endif
 
 /**
  * @brief Duplicate a string to newly allocated memory
@@ -218,7 +265,18 @@ gsh_strdup__(const char *s, const char *file, int line, const char *function)
 	return p;
 }
 
+#ifdef LINUX
+#define gsh_strdup(s) ({ \
+	char *p_ = strdup(s); \
+	if (p_ == NULL) { \
+		LogMallocFailure(__FILE__, __LINE__, __func__, "gsh_strdup"); \
+		abort(); \
+	} \
+	p_; \
+	})
+#else
 #define gsh_strdup(s) gsh_strdup__(s, __FILE__, __LINE__, __func__)
+#endif
 
 /**
  * @brief Duplicate a string to newly allocated memory (bounded)
@@ -257,8 +315,18 @@ gsh_strldup__(const char *s, size_t length, size_t *copied,
 	return p;
 }
 
+#ifdef LINUX
+#define gsh_strldup(s, l, n) ({ \
+	char *p_ = (char *) gsh_malloc(l+1); \
+	memcpy(p_, s, l); \
+	p_[l] = '\0'; \
+	*n = l + 1; \
+	p_; \
+	})
+#else
 #define gsh_strldup(s, l, n) gsh_strldup__(s, l, n, __FILE__, __LINE__, \
 						__func__)
+#endif
 
 /**
  * @brief Free a block of memory

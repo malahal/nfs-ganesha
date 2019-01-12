@@ -923,11 +923,6 @@ tirpc_pkg_params ntirpc_pp = {
 	0,
 	0,
 	(mem_format_t)rpc_warnx,
-	gsh_free_size,
-	gsh_malloc__,
-	gsh_malloc_aligned__,
-	gsh_calloc__,
-	gsh_realloc__,
 };
 
 /**

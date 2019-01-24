@@ -285,10 +285,15 @@ bool ng_innetgr(const char *group, const char *host)
 	rc = innetgr(group, host, NULL, NULL);
 
 	PTHREAD_RWLOCK_wrlock(&ng_lock);
-	if (rc)
+	if (rc) {
 		ng_add(group, host, false);	/* positive lookup */
-	else
+		LogDebug(COMPONENT_IDMAPPER,
+			 "innetgr for %s:%s rc=%d", group, host, rc);
+	} else {
 		ng_add(group, host, true);	/* negative lookup */
+		LogDebug(COMPONENT_IDMAPPER,
+			 "innetgr for %s:%s failed", group, host);
+	}
 	PTHREAD_RWLOCK_unlock(&ng_lock);
 
 	return rc;

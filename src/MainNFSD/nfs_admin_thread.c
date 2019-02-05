@@ -35,6 +35,7 @@
 #include <pthread.h>
 #ifdef LINUX
 #include <mcheck.h>		/* For mtrace/muntrace */
+#include <malloc.h>
 #endif
 
 #include "nfs_core.h"
@@ -436,6 +437,14 @@ admin_dbus_malloc_untrace(DBusMessageIter *args,
 #endif
 
  out:
+	/* Print malloc info */
+	{
+		FILE *fp = fopen("/tmp/malloc_info.xml", "a");
+
+		malloc_info(0, fp);
+		(void)fclose(fp);
+	}
+
 	dbus_status_reply(&iter, success, errormsg);
 	return success;
 }

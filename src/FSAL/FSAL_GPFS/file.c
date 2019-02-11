@@ -905,6 +905,8 @@ gpfs_write2(struct fsal_obj_handle *obj_hdl, bool bypass, struct state_t *state,
 	struct gpfs_fsal_export *exp = container_of(op_ctx->fsal_export,
 					struct gpfs_fsal_export, export);
 	int export_fd = exp->export_fd;
+	struct gpfs_fsal_obj_handle *myself =
+		container_of(obj_hdl, struct gpfs_fsal_obj_handle, obj_handle);
 
 	if (obj_hdl->fsal != obj_hdl->fs->fsal) {
 		LogDebug(COMPONENT_FSAL,
@@ -921,6 +923,11 @@ gpfs_write2(struct fsal_obj_handle *obj_hdl, bool bypass, struct state_t *state,
 			 "find_fd failed %s", msg_fsal_err(status.major));
 		return status;
 	}
+
+	LogEvent(COMPONENT_FSAL,
+		 "inode:%"PRIu64", offset:%lld, len:%zu, sync:%d",
+		 get_handle2inode(myself->handle), (long long)offset,
+		 buffer_size, *fsal_stable);
 
 	if (info)
 		status = gpfs_write_plus_fd(my_fd, offset,
@@ -946,12 +953,13 @@ gpfs_write2(struct fsal_obj_handle *obj_hdl, bool bypass, struct state_t *state,
 		PTHREAD_RWLOCK_unlock(&obj_hdl->obj_lock);
 
 	if (FSAL_IS_ERROR(status)) {
-		struct gpfs_file_handle *gfh = container_of(obj_hdl,
-				struct gpfs_fsal_obj_handle,obj_handle)->handle;
-
-		LogDebug(COMPONENT_FSAL, "Inode involved: %"PRIu64", error: %s",
-			get_handle2inode(gfh), msg_fsal_err(status.major));
+		LogEvent(COMPONENT_FSAL, "write failed, error: %s",
+			msg_fsal_err(status.major));
+	} else {
+		LogEvent(COMPONENT_FSAL, "write success:%zu, sync: %d",
+			*wrote_amount, *fsal_stable);
 	}
+
 	return status;
 }
 
@@ -973,12 +981,16 @@ gpfs_commit_fd(int my_fd, struct fsal_obj_handle *obj_hdl, off_t offset,
 	arg.length = len;
 	arg.verifier4 = (int32_t *) &writeverf;
 
+	LogEvent(COMPONENT_FSAL, "inode:%"PRIu64", offset:%lld, len:%zu",
+		 get_handle2inode(myself->handle), (long long)offset, len);
 	if (gpfs_ganesha(OPENHANDLE_FSYNC, &arg) == -1) {
 		retval = errno;
+		LogEvent(COMPONENT_FSAL, "commit failed, errno: %d", retval);
 		if (retval == EUNATCH)
 			LogFatal(COMPONENT_FSAL, "GPFS Returned EUNATCH");
 		return fsalstat(posix2fsal_error(retval), retval);
 	}
+	LogEvent(COMPONENT_FSAL, "commit successful");
 
 	return fsalstat(ERR_FSAL_NO_ERROR, 0);
 }

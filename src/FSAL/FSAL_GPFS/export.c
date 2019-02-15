@@ -651,6 +651,7 @@ int gpfs_claim_filesystem(struct fsal_filesystem *fs, struct fsal_export *exp)
 	if (pthread_attr_setstacksize(&attr_thr, 2116488) != 0)
 		LogCrit(COMPONENT_THREAD, "can't set pthread's stack size");
 
+#if 0
 	if (pthread_create(&gpfs_fs->up_thread, &attr_thr, GPFSFSAL_UP_Thread,
 			   gpfs_fs)) {
 		retval = errno;
@@ -659,6 +660,7 @@ int gpfs_claim_filesystem(struct fsal_filesystem *fs, struct fsal_export *exp)
 			retval, strerror(retval));
 		goto errout;
 	}
+#endif
 
 	fs->private_data = gpfs_fs;
 
@@ -689,8 +691,10 @@ void gpfs_unclaim_filesystem(struct fsal_filesystem *fs)
 	struct gpfs_filesystem *gpfs_fs = fs->private_data;
 	struct glist_head *glist, *glistn;
 	struct gpfs_filesystem_export_map *map;
+#if 0
 	struct callback_arg callback = {0};
 	int reason = THREAD_STOP;
+#endif
 
 	if (gpfs_fs == NULL)
 		goto out;
@@ -714,6 +718,7 @@ void gpfs_unclaim_filesystem(struct fsal_filesystem *fs)
 		gsh_free(map);
 	}
 
+#if 0
 	/* Terminate GPFS upcall thread */
 	callback.mountdirfd = gpfs_fs->root_fd;
 	callback.reason = &reason;
@@ -726,6 +731,7 @@ void gpfs_unclaim_filesystem(struct fsal_filesystem *fs)
 		LogFullDebug(COMPONENT_FSAL, "Thread STOP successful");
 
 	pthread_join(gpfs_fs->up_thread, NULL);
+#endif
 	free_gpfs_filesystem(gpfs_fs);
 	fs->private_data = NULL;
 

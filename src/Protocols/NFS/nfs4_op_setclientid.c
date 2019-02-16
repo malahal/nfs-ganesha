@@ -203,7 +203,8 @@ int nfs4_op_setclientid(struct nfs_argop4 *op, compound_data_t *data,
 		/* Check if confirmed record is for (v, x, c, l, s) */
 		if (credmatch && memcmp(arg_SETCLIENTID4->client.verifier,
 					conf->cid_incoming_verifier,
-					NFS4_VERIFIER_SIZE) == 0) {
+					NFS4_VERIFIER_SIZE) == 0
+			&& conf->cid_confirmed == CONFIRMED_CLIENT_ID) {
 			/* CASE 2:
 			 *
 			 * A confirmed record exists for this long

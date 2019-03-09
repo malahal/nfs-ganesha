@@ -369,6 +369,10 @@ cache_inode_new_entry(struct fsal_obj_handle *new_obj,
 		glist_init(&nentry->object.dir.export_roots);
 		/* init avl tree */
 		cache_inode_avl_init(nentry);
+
+		/* Initialize parent key */
+		nentry->object.dir.parent.kv.len = 0;
+		nentry->object.dir.parent.kv.addr = 0;
 		break;
 
 	case SYMBOLIC_LINK:

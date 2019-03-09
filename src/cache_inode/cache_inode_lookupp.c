@@ -142,6 +142,7 @@ cache_inode_lookupp_impl(cache_entry_t *entry,
 			return status;
 
 		/* Dup keys */
+		cache_inode_key_delete(&entry->object.dir.parent);
 		cache_inode_key_dup(&entry->object.dir.parent,
 				    &((*parent)->fh_hk.key));
 	}

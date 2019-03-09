@@ -413,8 +413,10 @@ cache_inode_lru_clean(cache_entry_t *entry)
 		}
 	}
 
-	if (entry->type == DIRECTORY)
+	if (entry->type == DIRECTORY) {
 		cache_inode_release_dirents(entry, CACHE_INODE_AVL_BOTH);
+		cache_inode_key_delete(&entry->object.dir.parent);
+	}
 
 	/* Free FSAL resources */
 	if (entry->obj_handle) {

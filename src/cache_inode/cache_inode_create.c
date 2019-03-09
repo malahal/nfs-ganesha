@@ -226,6 +226,7 @@ cache_inode_create(cache_entry_t *parent,
 
 	if (type == DIRECTORY) {
 		/* Insert Parent's key */
+		cache_inode_key_delete(&(*entry)->object.dir.parent);
 		cache_inode_key_dup(&(*entry)->object.dir.parent,
 				    &parent->fh_hk.key);
 	}

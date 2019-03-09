@@ -197,9 +197,10 @@ cache_inode_operate_cached_dirent(cache_entry_t *directory,
 				 * old */
 				cache_entry_t *oldentry;
 
-				avl_dirent_set_deleted(directory, dirent);
+				cache_inode_key_delete(&dirent2->ckey);
 				cache_inode_key_dup(&dirent2->ckey,
 						    &dirent->ckey);
+				avl_dirent_set_deleted(directory, dirent);
 				oldentry =
 				    cache_inode_get_keyed(
 					    &dirent2->ckey,
@@ -225,6 +226,8 @@ cache_inode_operate_cached_dirent(cache_entry_t *directory,
 					     + newnamesize);
 			memcpy(dirent3->name, newname, newnamesize);
 			dirent3->flags = DIR_ENTRY_FLAG_NONE;
+			dirent3->ckey.kv.len = 0;
+			dirent3->ckey.kv.addr = 0;
 			cache_inode_key_dup(&dirent3->ckey, &dirent->ckey);
 			avl_dirent_set_deleted(directory, dirent);
 			code = cache_inode_avl_qp_insert(directory, dirent3);
@@ -293,6 +296,8 @@ cache_inode_add_cached_dirent(cache_entry_t *parent,
 	new_dir_entry->flags = DIR_ENTRY_FLAG_NONE;
 
 	memcpy(&new_dir_entry->name, name, namesize);
+	new_dir_entry->ckey.kv.len = 0;
+	new_dir_entry->ckey.kv.addr = 0;
 	cache_inode_key_dup(&new_dir_entry->ckey, &entry->fh_hk.key);
 
 	/* add to avl */
@@ -425,6 +430,7 @@ populate_dirent(const char *name, void *dir_state,
 
 	if (cache_entry->type == DIRECTORY) {
 		/* Insert Parent's key */
+		cache_inode_key_delete(&cache_entry->object.dir.parent);
 		cache_inode_key_dup(&cache_entry->object.dir.parent,
 				    &state->directory->fh_hk.key);
 	}

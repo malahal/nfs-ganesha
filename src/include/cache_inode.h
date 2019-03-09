@@ -295,6 +295,12 @@ static inline int
 cache_inode_key_dup(cache_inode_key_t *tgt,
 		    cache_inode_key_t *src)
 {
+	if (tgt->kv.len != 0 || tgt->kv.addr != 0) {
+		LogEvent(COMPONENT_CACHE_INODE,
+			 "Possible memleak: key len = %zu, key addr = 0x%p",
+			 tgt->kv.len, tgt->kv.addr);
+	}
+
 	tgt->kv.len = src->kv.len;
 	tgt->kv.addr = gsh_malloc(src->kv.len);
 
@@ -320,9 +326,11 @@ cache_inode_key_dup(cache_inode_key_t *tgt,
 static inline void
 cache_inode_key_delete(cache_inode_key_t *key)
 {
-	key->kv.len = 0;
-	gsh_free(key->kv.addr);
-	key->kv.addr = (void *)0xdeaddeaddeaddead;
+	if (key->kv.len != 0) {
+		gsh_free(key->kv.addr);
+		key->kv.len = 0;
+		key->kv.addr = NULL;
+	}
 }
 
 /**

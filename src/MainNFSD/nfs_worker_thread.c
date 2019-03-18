@@ -1512,6 +1512,32 @@ static void worker_thread_finalizer(struct fridgethr_context *ctx)
 	ctx->thread_info = NULL;
 }
 
+static void free_args_auth(request_data_t *reqdata)
+{
+	const nfs_function_desc_t *reqdesc = reqdata->r_u.req.funcdesc;
+	nfs_arg_t *arg_nfs = &reqdata->r_u.req.arg_nfs;
+
+	if (reqdata->rtype != NFS_REQUEST)
+		return;
+
+	/* Free the arguments */
+	if ((reqdata->r_u.req.svc.rq_msg.cb_vers == 2)
+	 || (reqdata->r_u.req.svc.rq_msg.cb_vers == 3)
+	 || (reqdata->r_u.req.svc.rq_msg.cb_vers == 4)) {
+		if (!SVC_FREEARGS(&reqdata->r_u.req.svc,
+				  reqdesc->xdr_decode_func,
+				  (caddr_t) arg_nfs)) {
+			LogCrit(COMPONENT_DISPATCH,
+				"NFS DISPATCHER: FAILURE: Bad SVC_FREEARGS for %s",
+				reqdesc->funcname);
+		}
+	}
+
+	if (reqdata->r_u.req.svc.rq_auth)
+		SVCAUTH_RELEASE(reqdata->r_u.req.svc.rq_auth,
+				&(reqdata->r_u.req.svc));
+}
+
 /**
  * @brief The main function for a worker thread
  *
@@ -1550,7 +1576,12 @@ static void worker_run(struct fridgethr_context *ctx)
 			    xp_flags & SVC_XPRT_FLAG_DESTROYED) {
 				/* Idempotent: once set, the DESTROYED flag
 				 * is never cleared. No lock needed.
+				 *
+				 * Request reqdata is freed in the label
+				 * itself. So we will free nfs_args,
+				 * svc_auth in this function.
 				 */
+				free_args_auth(reqdata);
 				goto finalize_req;
 			}
 

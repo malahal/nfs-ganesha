@@ -51,6 +51,7 @@
 #define NFS_LOOKAHEAD_SETCLIENTID_CONFIRM  0x0200
 #define NFS_LOOKAHEAD_LOOKUP 0x0400
 #define NFS_LOOKAHEAD_READLINK 0x0800
+#define NFS_LOOKAHEAD_STATD 0x1000
 /* ... */
 
 struct nfs_request_lookahead {

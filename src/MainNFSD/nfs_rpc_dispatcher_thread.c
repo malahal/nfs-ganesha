@@ -1252,6 +1252,22 @@ void nfs_rpc_enqueue_req(request_data_t *reqdata)
 			     reqdata->r_u.req.lookahead.flags);
 
 		slot = atomic_inc_uint32_t(&mslot) & (N_REQ_QUEUES - 1);
+
+		/* Hack for rpc.stad not responding in some cases
+		 * leading to unstable NFS. Confine NLM locks to a
+		 * single thread in slot 0.
+		 */
+		if (reqdata->r_u.req.lookahead.flags & NFS_LOOKAHEAD_STATD) {
+			slot = 0;
+		} else if (slot == 0) {
+			/* slot 0 reserved for NLM lock reqs. Place this
+			 * non-NLM lock request in the next slot! Should
+			 * be slot 1 if N_REQ_QUEUES is more than 1,
+			 * else slot 0!
+			 */
+			slot = 1 & (N_REQ_QUEUES - 1);
+		}
+
 		qpair = &(nfs_request_q->qset[slot]);
 		break;
 #ifdef _USE_9P

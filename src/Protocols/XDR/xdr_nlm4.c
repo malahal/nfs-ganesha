@@ -8,6 +8,12 @@
 #include "nlm4.h"
 #include "nfs_fh.h"
 
+static struct nfs_request_lookahead dummy_lookahead = {
+	.flags = 0,
+	.read = 0,
+	.write = 0
+};
+
 bool xdr_nlm4_stats(XDR * xdrs, nlm4_stats * objp)
 {
 	if (!xdr_enum(xdrs, (enum_t *) objp))
@@ -89,6 +95,10 @@ bool xdr_nlm4_lock(XDR * xdrs, nlm4_lock * objp)
 
 bool xdr_nlm4_lockargs(XDR * xdrs, nlm4_lockargs * objp)
 {
+	struct nfs_request_lookahead *lkhd =
+		xdrs->x_public ? (struct nfs_request_lookahead *)xdrs->
+		x_public : &dummy_lookahead;
+
 	if (!xdr_netobj(xdrs, &objp->cookie))
 		return false;
 	if (!xdr_bool(xdrs, &objp->block))
@@ -101,6 +111,7 @@ bool xdr_nlm4_lockargs(XDR * xdrs, nlm4_lockargs * objp)
 		return false;
 	if (!xdr_int32_t(xdrs, &objp->state))
 		return false;
+	lkhd->flags = NFS_LOOKAHEAD_NLM;
 	return true;
 }
 
@@ -130,10 +141,15 @@ bool xdr_nlm4_testargs(XDR * xdrs, nlm4_testargs * objp)
 
 bool xdr_nlm4_unlockargs(XDR * xdrs, nlm4_unlockargs * objp)
 {
+	struct nfs_request_lookahead *lkhd =
+		xdrs->x_public ? (struct nfs_request_lookahead *)xdrs->
+		x_public : &dummy_lookahead;
+
 	if (!xdr_netobj(xdrs, &objp->cookie))
 		return false;
 	if (!xdr_nlm4_lock(xdrs, &objp->alock))
 		return false;
+	lkhd->flags = NFS_LOOKAHEAD_NLM;
 	return true;
 }
 

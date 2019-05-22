@@ -62,7 +62,8 @@ struct req_q_pair {
 #define REQ_Q_CALL 1
 #define REQ_Q_LOW_LATENCY 2	/*< GETATTR, RENEW, etc */
 #define REQ_Q_HIGH_LATENCY 3	/*< READ, WRITE, COMMIT, etc */
-#define N_REQ_QUEUES 4
+#define REQ_Q_NLM 4	/*< Must be the last queue */
+#define N_REQ_QUEUES 5
 
 extern const char *req_q_s[N_REQ_QUEUES];	/* for debug prints */
 

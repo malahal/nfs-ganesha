@@ -93,7 +93,8 @@ const char *req_q_s[N_REQ_QUEUES] = {
 	"REQ_Q_MOUNT",
 	"REQ_Q_CALL",
 	"REQ_Q_LOW_LATENCY",
-	"REQ_Q_HIGH_LATENCY"
+	"REQ_Q_HIGH_LATENCY",
+	"REQ_Q_NLM"
 };
 
 static u_int nfs_rpc_recv_user_data(SVCXPRT *xprt, SVCXPRT *newxprt,
@@ -1415,6 +1416,10 @@ void nfs_rpc_enqueue_req(request_data_t *reqdata)
 			qpair = &(nfs_request_q->qset[REQ_Q_MOUNT]);
 			break;
 		}
+		if (reqdata->r_u.req.lookahead.flags & NFS_LOOKAHEAD_NLM) {
+			qpair = &(nfs_request_q->qset[REQ_Q_NLM]);
+			break;
+		}
 		if (NFS_LOOKAHEAD_HIGH_LATENCY(reqdata->r_u.req.lookahead))
 			qpair = &(nfs_request_q->qset[REQ_Q_HIGH_LATENCY]);
 		else
@@ -1565,6 +1570,21 @@ request_data_t *nfs_rpc_consume_req(struct req_q_pair *qpair)
 	return reqdata;
 }
 
+static bool nlm_thread(nfs_worker_data_t *worker)
+{
+	/* We need at least one NLM thread. NLM threads do serve other
+	 * requests, so it is OK to not have non-NLM threads at all! We
+	 * use approximately 2% of worker threads as NLM threads
+	 */
+	static unsigned int nlm_nthreads;
+
+	if (nlm_nthreads == 0)
+		nlm_nthreads = (int)(nfs_param.core_param.nb_worker * .02) + 1;
+
+	/* worker_index starts from 1 */
+	return (worker->worker_index <= nlm_nthreads);
+}
+
 request_data_t *nfs_rpc_dequeue_req(nfs_worker_data_t *worker)
 {
 	request_data_t *reqdata = NULL;
@@ -1580,8 +1600,20 @@ request_data_t *nfs_rpc_dequeue_req(nfs_worker_data_t *worker)
 
 	/* slot in 1..4 */
  retry_deq:
-	slot = (nfs_rpc_q_next_slot() % 4);
-	for (ix = 0; ix < 4; ++ix) {
+	/* NLM threads (first few) use the NLM slot to begin with.
+	 * Others threads don't use NLM slot to begin with.  This is to
+	 * avoid all worker threads working on NLM requests which may
+	 * take a very very long time due to non-responsiveness of
+	 * rpc.statd in face of DNS issues!
+	 */
+	if (nlm_thread(worker)) {
+		slot = REQ_Q_NLM; /* last queue */
+	} else {
+		/* Don't use the last NLM slot for these threads */
+		slot = nfs_rpc_q_next_slot() % (N_REQ_QUEUES - 1);
+	}
+
+	for (ix = 0; ix < N_REQ_QUEUES; ++ix) {
 		switch (slot) {
 		case 0:
 			/* MOUNT */
@@ -1598,6 +1630,10 @@ request_data_t *nfs_rpc_dequeue_req(nfs_worker_data_t *worker)
 		case 3:
 			/* HL */
 			qpair = &(nfs_request_q->qset[REQ_Q_HIGH_LATENCY]);
+			break;
+		case 4:
+			/* NLM */
+			qpair = &(nfs_request_q->qset[REQ_Q_NLM]);
 			break;
 		default:
 			/* not here */
@@ -1627,8 +1663,7 @@ request_data_t *nfs_rpc_dequeue_req(nfs_worker_data_t *worker)
 		}
 
 		++slot;
-		slot = slot % 4;
-
+		slot = slot % N_REQ_QUEUES;
 	}			/* for */
 
 	/* wait */

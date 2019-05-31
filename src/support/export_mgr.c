@@ -64,6 +64,7 @@
 #include "nfs_exports.h"
 #include "nfs_proto_functions.h"
 #include "pnfs_utils.h"
+#include <malloc.h>
 
 /**
  * @brief Exports are stored in an AVL tree with front-end cache.
@@ -1496,6 +1497,14 @@ static bool show_cache_inode_stats(DBusMessageIter *args,
 	bool success = true;
 	char *errormsg = "OK";
 	DBusMessageIter iter;
+	FILE *fp;
+
+	/* HACK: print malloc_info a file in /tmp */
+	fp = fopen("/tmp/malloc_info.xml", "w");
+	if (fp != NULL) {
+		malloc_info(0, fp);
+		fclose(fp);
+	}
 
 	dbus_message_iter_init_append(reply, &iter);
 	dbus_status_reply(&iter, success, errormsg);

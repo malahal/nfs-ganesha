@@ -315,6 +315,7 @@ hashtable_init(struct hash_param *hparam)
 	}
 #endif				/* GLIBC */
 
+	hparam->index_size = 1;
 	ht = gsh_calloc(1, sizeof(struct hash_table) +
 			(sizeof(struct hash_partition) *
 			 hparam->index_size));
@@ -323,9 +324,7 @@ hashtable_init(struct hash_param *hparam)
 
 	/* Fixup entry size */
 	if (hparam->flags & HT_FLAG_CACHE) {
-		if (!hparam->cache_entry_count)
-			/* works fine with a good hash algo */
-			hparam->cache_entry_count = 32767;
+		hparam->cache_entry_count = 97;
 	}
 
 	/* We need to save copy of the parameters in the table. */

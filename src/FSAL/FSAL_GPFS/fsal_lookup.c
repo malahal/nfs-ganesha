@@ -51,6 +51,7 @@
  *  @return - ERR_FSAL_NO_ERROR, if no error.
  *          - Another error code else.
  */
+#define GPFS_ROOT_INODE  3
 fsal_status_t
 GPFSFSAL_lookup(const struct req_op_context *op_ctx,
 		struct fsal_obj_handle *parent, const char *filename,
@@ -104,12 +105,11 @@ GPFSFSAL_lookup(const struct req_op_context *op_ctx,
 	 * If so, fill in the handle ourselves and act as though it
 	 * succeeded.
 	 */
-	if (status.major == ERR_FSAL_NOENT &&
-	    strncmp(filename, "..", 3) == 0) {
+	if (status.major == ERR_FSAL_NOENT && strcmp(filename, "..") == 0) {
 		unsigned long long pinode;
 
 		pinode = get_handle2inode(parent_hdl->handle);
-		if (pinode == 3) {
+		if (pinode == GPFS_ROOT_INODE) {
 			LogEvent(COMPONENT_FSAL,
 				 "Lookup of DOTDOT failed in ROOT dir");
 			*fh = *parent_hdl->handle;
@@ -139,13 +139,13 @@ GPFSFSAL_lookup(const struct req_op_context *op_ctx,
 	 */
 	if (strcmp(filename, "..") == 0) {
 		struct gpfs_file_handle *gfh;
-		unsigned long long inode, pinode;
+		unsigned long long inode;
 
-		gfh = container_of(parent, struct gpfs_fsal_obj_handle,
-				       obj_handle)->handle;
+		gfh = parent_hdl->handle;
 		inode = get_handle2inode(gfh);
-		pinode = get_handle2inode(fh);
-		if (inode == pinode && inode > 9) {
+		if (inode != GPFS_ROOT_INODE &&
+		    gfh->handle_size == fh->handle_size &&
+		    memcmp(gfh, fh, gfh->handle_size) == 0) {
 			LogCrit(COMPONENT_FSAL,
 				"DOTDOT error, inode: %llu", inode);
 			fsal_internal_close(parent_fd, NULL, 0);

@@ -100,7 +100,7 @@ void freenetconfigent(struct netconfig *);
  *
  * The empty string lets GSSAPI use keytab specified in /etc/krb5.conf
  */
-#define DEFAULT_NFS_KEYTAB ""
+#define DEFAULT_NFS_KEYTAB GSSD_DEFAULT_KEYTAB_FILE
 
 #ifdef _HAVE_GSSAPI
 /**

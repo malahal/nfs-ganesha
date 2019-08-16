@@ -198,6 +198,22 @@ class ServerAdmin():
         status, msg = self.admin.purge_gids()
         self.status_message(status, msg)
 
+    def trim_enable(self):
+        status, msg = self.admin.trim_enable()
+        self.status_message(status, msg)
+
+    def trim_disable(self):
+        status, msg = self.admin.trim_disable()
+        self.status_message(status, msg)
+
+    def trim_call(self):
+        status, msg = self.admin.trim_call()
+        self.status_message(status, msg)
+
+    def trim_status(self):
+        status, msg = self.admin.trim_status()
+        self.status_message(status, msg)
+
     def status_message(self, status, errormsg):
         print("Returns: status = %s, %s" % (str(status), errormsg))
 
@@ -335,6 +351,10 @@ if __name__ == '__main__':
        "   purge idmap: Purges idmapper cache\n\n"                      \
        "   purge gids: Purges gids cache\n\n"                      \
        "   grace ipaddr: Begins grace for the given IP\n\n"                  \
+       "   trim enable: Enable malloc trim\n\n"                              \
+       "   trim disable: Disable malloc trim\n\n"                            \
+       "   trim call: Call malloc trim\n\n"                            \
+       "   trim status: Get current malloc trim status\n\n"                  \
        "   get_log component: Gets the log level for the given component\n\n"\
        "   set_log component level: \n"                                      \
        "       Sets the given log level to the given component\n\n"          \
@@ -426,6 +446,24 @@ if __name__ == '__main__':
                  " Try \"ganesha_mgr.py help\" for more info")
            sys.exit(1)
         ganesha.grace(sys.argv[2])
+
+    elif sys.argv[1] == "trim":
+        if len(sys.argv) < 3:
+            print("trim requires enable/disable/call/status arg. "
+                  "Try \"ganesha_mgr.py help\" for more info")
+            sys.exit(1)
+
+        if sys.argv[2] == 'enable':
+            ganesha.trim_enable()
+        elif sys.argv[2] == 'disable':
+            ganesha.trim_disable()
+        elif sys.argv[2] == 'status':
+            ganesha.trim_status()
+        elif sys.argv[2] == 'call':
+            ganesha.trim_call()
+        else:
+            msg = "trim '%s' is unknown" % sys.argv[2]
+            sys.exit(msg)
 
     elif sys.argv[1] == "set_log":
         if len(sys.argv) < 4:

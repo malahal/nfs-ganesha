@@ -400,6 +400,7 @@ typedef struct nfs_core_param {
 	    ganesha instance. If this is set, dbus name will be
 	    <prefix>.org.ganesha.nfsd */
 	char *dbus_name_prefix;
+	bool enable_trim; /* Enable malloc trim */
 } nfs_core_parameter_t;
 
 /** @} */

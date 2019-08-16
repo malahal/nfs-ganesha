@@ -193,6 +193,8 @@ static struct config_item core_params[] = {
 		       nfs_core_param, mount_path_pseudo),
 	CONF_ITEM_STR("Dbus_Name_Prefix", 1, 255, NULL,
 		       nfs_core_param, dbus_name_prefix),
+	CONF_ITEM_BOOL("enable_trim", false,
+		       nfs_core_param, enable_trim),
 	CONFIG_EOL
 };
 

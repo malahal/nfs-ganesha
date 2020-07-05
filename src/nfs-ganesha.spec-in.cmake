@@ -22,7 +22,11 @@ BuildRequires: openSUSE-release
 Requires: openSUSE-release
 %endif
 
+%if (0%{sle_version} >= 150000)
+%define dist .sles15
+%else
 %define dist .sles12
+%endif
 
 %global with_systemd 1
 %global with_nfsidmap 1
@@ -189,11 +193,7 @@ Requires(postun): systemd
 BuildRequires:	initscripts
 %endif
 %if %{with man_page}
-%if ( 0%{?fedora} >= 28 || 0%{?rhel} >= 8 )
 BuildRequires: python3-sphinx
-%else
-BuildRequires: python-sphinx
-%endif
 %endif
 Requires(post): psmisc
 Requires(pre): /usr/sbin/useradd
@@ -240,20 +240,15 @@ be used with NFS-Ganesha to support PROXY based filesystems
 %package utils
 Summary: The NFS-GANESHA util scripts
 Group: Applications/System
-%if ( 0%{?suse_version} )
-Requires:	dbus-1-python, python-gobject2, python-pyparsing
-Requires: 	gpfs.nfs-ganesha = %{version}-%{release}, python
-BuildRequires:  python-devel
-%else
-%if ( 0%{?rhel} >= 8 )
-Requires:	python3-dbus, python3-gobject, python3-pyparsing
+%if (0%{suse_version} && 0%{sle_version} >= 150000)
+Requires:	python3-dbus-python, python3-gobject, python3-pyparsing
 Requires: 	gpfs.nfs-ganesha = %{version}-%{release}, python3
 BuildRequires:  python3-devel
 %else
-Requires:       dbus-python, pygobject2, pyparsing
-Requires: 	gpfs.nfs-ganesha = %{version}-%{release}, python2
-BuildRequires:  python2-devel
-%endif
+# rhel
+Requires:	python3-dbus, python3-gobject, python3-pyparsing
+Requires: 	gpfs.nfs-ganesha = %{version}-%{release}, python3
+BuildRequires:  python3-devel
 %endif
 
 %if %{with gui_utils}
@@ -478,6 +473,9 @@ cmake .	-DCMAKE_BUILD_TYPE=Debug			\
 	-DRPCBIND=%{use_rpcbind}			\
 	-D_MSPAC_SUPPORT=%{use_mspac_support}		\
 	-DSANITIZE_ADDRESS=%{use_sanitize_address}	\
+%if (0%{suse_version} && 0%{sle_version} >= 150000)
+	-DKRB5_PREFIX=/usr/lib/mit			\
+%endif
 %if %{with jemalloc}
 	-DALLOCATOR=jemalloc 				\
 %endif
@@ -580,13 +578,8 @@ install -p -m 644 selinux/ganesha.if %{buildroot}%{_selinux_store_path}/devel/in
 install -m 0644 selinux/ganesha.pp.bz2 %{buildroot}%{_selinux_store_path}/packages
 %endif
 
-%if ( 0%{?rhel} && 0%{?rhel} < 8 )
-rm -f %{buildroot}/%{python_sitelib}/gpfs*
-rm -f %{buildroot}/%{python_sitelib}/__init__.*
-%else
 rm -f %{buildroot}/%{python3_sitelib}/gpfs*
 rm -f %{buildroot}/%{python3_sitelib}/__init__.*
-%endif
 
 %post
 %if ( 0%{?suse_version} )
@@ -805,18 +798,9 @@ exit 0
 
 %if %{with utils}
 %files utils
-%if ( 0%{?suse_version} )
-%{python_sitelib}/Ganesha/*
-%{python_sitelib}/ganeshactl-*-info
-%else
-%if ( 0%{?rhel} >= 8 )
 %{python3_sitelib}/Ganesha/*
 %{python3_sitelib}/ganeshactl-*-info
-%else
-%{python2_sitelib}/Ganesha/*
-%{python2_sitelib}/ganeshactl-*-info
-%endif
-%endif
+
 %if %{with gui_utils}
 %{_bindir}/ganesha-admin
 %{_bindir}/manage_clients
@@ -826,6 +810,7 @@ exit 0
 %{_bindir}/client_stats_9pOps
 %{_bindir}/export_stats_9pOps
 %endif
+
 %{_bindir}/fake_recall
 %{_bindir}/get_clientids
 %{_bindir}/grace_period

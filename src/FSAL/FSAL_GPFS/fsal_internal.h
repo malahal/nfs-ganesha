@@ -349,7 +349,33 @@ void fsal_gpfs_reset_stats(struct fsal_module *fsal_hdl);
 
 void prepare_for_stats(struct fsal_module *fsal_hdl);
 
-int gpfs_op2index(int op);
+/* Ignoring 1002 and 1003 opcodes. The following macros depend on opcodes in
+ * gpfs_nfs.h interface file.
+ */
+#define GPFS_MIN_OP		 OPENHANDLE_GET_VERSION
+#define GPFS_MAX_OP		 OPENHANDLE_FS_LOCATIONS
+#define GPFS_STAT_NO_OP_1           3
+#define GPFS_STAT_NO_OP_2           4
+#define GPFS_STAT_NO_OP_3           5
+/* max stat ops including placeholder for phantom ops  */
+#define GPFS_STAT_MAX_OPS (GPFS_MAX_OP-GPFS_MIN_OP+2)
+/* placeholder index is the last index in the array */
+#define GPFS_STAT_PH_INDEX (GPFS_STAT_MAX_OPS-1)
+/* total ops excluding the missing ops 103, 104 and 105 and the placeholder
+ * for phantom ops */
+#define GPFS_TOTAL_OPS     (GPFS_STAT_MAX_OPS-4)
+
+extern struct fsal_stats gpfs_stats;
+
+static inline int gpfs_op2index(int op)
+{
+	if ((op < GPFS_MIN_OP) || (op > GPFS_MAX_OP) ||
+	    (op == 103 || op == 104 || op == 105))
+		return GPFS_STAT_PH_INDEX;
+	else
+		return (op - GPFS_MIN_OP);
+}
+
 uint64_t get_handle2inode(struct gpfs_file_handle *gfh);
 
 #endif

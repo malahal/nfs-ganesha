@@ -101,20 +101,6 @@ struct flock
 #define OPENHANDLE_QUOTA          151
 #define OPENHANDLE_FS_LOCATIONS   152
 
-/* If there is any change in above constants, then update below values.
- * Currently ignoring opcode 1002 */
-#define GPFS_MIN_OP		 OPENHANDLE_GET_VERSION
-#define GPFS_MAX_OP		 OPENHANDLE_FS_LOCATIONS
-#define GPFS_STAT_NO_OP_1           3
-#define GPFS_STAT_NO_OP_2           4
-#define GPFS_STAT_NO_OP_3           5
-/* max stat ops including placeholder for phantom ops  */
-#define GPFS_STAT_MAX_OPS (GPFS_MAX_OP-GPFS_MIN_OP+2)
-/* placeholder index is the last index in the array */
-#define GPFS_STAT_PH_INDEX (GPFS_STAT_MAX_OPS-1)
-/* total ops excluding the missing ops 103, 104 and 105 and the placeholder
- * for phantom ops */
-#define GPFS_TOTAL_OPS     (GPFS_STAT_MAX_OPS-4)
 
 struct trace_arg
 {
@@ -757,7 +743,5 @@ struct quotactl_arg
 #ifdef __cplusplus
 }
 #endif
-
-extern struct fsal_stats gpfs_stats;
 
 #endif /* H_GPFS_NFS */

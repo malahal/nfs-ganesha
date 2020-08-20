@@ -32,6 +32,7 @@
 #include "fsal.h"
 
 #include "include/gpfs_nfs.h"
+#include "fsal_internal.h"
 #include "gsh_config.h"
 
 struct kxArgs {
@@ -132,15 +133,6 @@ static void valgrind_kganesha(struct kxArgs *args)
 	}
 }
 #endif
-
-int gpfs_op2index(int op)
-{
-	if ((op < GPFS_MIN_OP) || (op > GPFS_MAX_OP) ||
-	    (op == 103 || op == 104 || op == 105))
-		return GPFS_STAT_PH_INDEX;
-	else
-		return (op - GPFS_MIN_OP);
-}
 
 /**
  *  @param op Operation

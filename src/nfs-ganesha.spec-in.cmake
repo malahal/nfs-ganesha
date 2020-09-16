@@ -212,14 +212,6 @@ gpfs.nfs-ganesha : NFS-GANESHA is a NFS Server running in user space.
 It comes with various back-end modules (called FSALs) provided as
  shared objects to support different file systems and name-spaces.
 
-%package mount-9P
-Summary: a 9p mount helper
-Group: Applications/System
-
-%description mount-9P
-This package contains the mount.9P script that clients can use
-to simplify mounting to NFS-GANESHA. This is a 9p mount helper.
-
 %package vfs
 Summary: The NFS-GANESHA VFS FSAL
 Group: Applications/System
@@ -229,16 +221,6 @@ Requires: nfs-ganesha = %{version}-%{release}
 %description vfs
 This package contains a FSAL shared object to
 be used with NFS-Ganesha to support VFS based filesystems
-
-%package proxy
-Summary: The NFS-GANESHA PROXY FSAL
-Group: Applications/System
-BuildRequires: libattr-devel
-Requires: nfs-ganesha = %{version}-%{release}
-
-%description proxy
-This package contains a FSAL shared object to
-be used with NFS-Ganesha to support PROXY based filesystems
 
 %if %{with utils}
 %package utils
@@ -426,34 +408,6 @@ This package contains a FSAL shared object to
 be used with NFS-Ganesha to support Gluster
 %endif
 
-# SELINUX
-%if ( 0%{?fedora} >= 30 || 0%{?rhel} >= 8 )
-%package selinux
-Summary: The NFS-GANESHA SELINUX targeted policy
-Group: Applications/System
-BuildArch:	noarch
-Requires:	nfs-ganesha = %{version}-%{release}
-BuildRequires: selinux-policy-devel
-%{?selinux_requires}
-
-%description selinux
-This package contains an selinux policy for running ganesha.nfsd
-
-%post selinux
-%selinux_modules_install %{_datadir}/selinux/packages/ganesha.pp.bz2
-
-%pre selinux
-%selinux_relabel_pre
-
-%postun selinux
-if [ $1 -eq 0 ]; then
-    %selinux_modules_uninstall ganesha
-fi
-
-%posttrans
-%selinux_relabel_post
-%endif
-
 %prep
 %setup -q -n %{sourcename}
 
@@ -477,9 +431,9 @@ cmake .	-DCMAKE_BUILD_TYPE=Debug			\
 	-DUSE_RADOS_RECOV=%{use_rados_recov}		\
 	-DRADOS_URLS=%{use_rados_urls}			\
 	-DUSE_FSAL_VFS=ON				\
-	-DUSE_FSAL_PROXY=ON				\
+	-DUSE_FSAL_PROXY=OFF				\
 	-DUSE_DBUS=ON					\
-	-DUSE_9P=ON					\
+	-DUSE_9P=OFF					\
 	-DDISTNAME_HAS_GIT_DATA=OFF			\
 	-DUSE_MAN_PAGE=%{use_man_page}                  \
 	-DRPCBIND=%{use_rpcbind}			\
@@ -500,11 +454,6 @@ cmake .	-DCMAKE_BUILD_TYPE=Debug			\
 
 make %{?_smp_mflags} || make %{?_smp_mflags} || make
 
-%if ( 0%{?fedora} >= 30 || 0%{?rhel} >= 8 )
-make -C selinux -f /usr/share/selinux/devel/Makefile ganesha.pp
-pushd selinux && bzip2 -9 ganesha.pp && popd
-%endif
-
 %install
 mkdir -p %{buildroot}%{_sysconfdir}/ganesha/
 mkdir -p %{buildroot}%{_sysconfdir}/dbus-1/system.d
@@ -519,7 +468,6 @@ mkdir -p %{buildroot}%{_libexecdir}/ganesha
 install -m 644 config_samples/logrotate_ganesha	%{buildroot}%{_sysconfdir}/logrotate.d/ganesha
 install -m 644 scripts/ganeshactl/org.ganesha.nfsd.conf	%{buildroot}%{_sysconfdir}/dbus-1/system.d
 install -m 755 scripts/nfs-ganesha-config.sh %{buildroot}%{_libexecdir}/ganesha
-install -m 755 tools/mount.9P	%{buildroot}%{_sbindir}/mount.9P
 
 install -m 644 config_samples/vfs.conf %{buildroot}%{_sysconfdir}/ganesha
 
@@ -697,24 +645,11 @@ exit 0
 %endif
 %endif
 
-
-%files mount-9P
-%{_sbindir}/mount.9P
-%if %{with man_page}
-%{_mandir}/*/ganesha-9p-config.8.gz
-%endif
-
 %files vfs
 %{_libdir}/ganesha/libfsalvfs*
 %config(noreplace) %{_sysconfdir}/ganesha/vfs.conf
 %if %{with man_page}
 %{_mandir}/*/ganesha-vfs-config.8.gz
-%endif
-
-%files proxy
-%{_libdir}/ganesha/libfsalproxy*
-%if %{with man_page}
-%{_mandir}/*/ganesha-proxy-config.8.gz
 %endif
 
 # Optional packages
